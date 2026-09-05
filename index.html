@@ -859,7 +859,7 @@
 /* このファイルの版。ファイル名の番号（salon-de-kou-karte_NN.html）と必ずそろえること。
    仕分け待ちの下書きを捨てるかどうかの判定（BUYVER）にも使うので、
    ここを上げ忘れると、古い読み取りで作られた下書きが生き残る（v87でやらかした） */
-const APPVER=198;
+const APPVER=200;
 const KEY="sdk:data";
 /* ★ v133：QC／SEED／PROD／MENU／QK／CHARTS0／STOCK0／ACTUAL／VISITS は
    **わざと空にしてあります。書き戻さないこと。**
@@ -3072,6 +3072,11 @@ function openKarteModal(id){
     </div>
     <div class="mo-ft">
       <button class="btn" id="k-edit">この内容を直す</button>
+      <!-- v200：直しているあいだだけ出す保存ボタン。
+           中身の欄は .mo-bd（max-height:66vh・スクロール）の中にあるので、
+           いちばん下の「保存する」は iPad ではスクロールしないと見えない。
+           **足もと（.mo-ft）はいつも見えている**ので、ここにも置く -->
+      <button class="btn" id="k-fsave" style="display:none">保存する</button>
       <button class="btn ghost" id="k-cust">このお客様のカルテ一覧</button>
       <button class="btn danger" id="k-del">削除</button>
       <span class="sp"></span>
@@ -3092,9 +3097,34 @@ function openKarteModal(id){
   /* v158：名簿へ飛ばすのをやめ、**そのお客様のカルテだけを並べて選べる**ようにした
      （名簿へ行くと「今日のカルテ」の入口や購入した商品まで出て、探しているものが埋もれる） */
   document.getElementById("k-cust").onclick=()=>openCustKarteList(k.cid);
+  /* ---------- 「保存ボタンが無い」の正体（v200） ----------
+     利用者の指摘：**「カルテ直しても保存ボタンがないから記憶しないよ」**
+
+     原因は2つ重なっていた。
+
+     ★1 **`id="k-save"` が文書に2つあった。**
+        新規カルテの欄（「カルテを保存」）と、この編集画面（「保存する」）。
+        名簿からカルテを開くと**両方が同じ文書に並ぶ**。
+        `document.getElementById("k-save")` は**先に見つかったほう＝新規カルテの欄**を返すので、
+        編集画面の「保存する」には**なにも結ばれていなかった**＝押しても無反応。
+        さらに悪いことに、新規カルテ側の保存ボタンが**編集画面の保存で上書き**されていた。
+        → 編集画面は `data-kesave` にして、`root` の中から引く。
+        このファイルは前から「**id を使わず data- で引く**」決まりだったのに、
+        保存ボタンだけ守れていなかった（v144 のおぼえがきに同じ注意が書いてある）。
+
+     ★2 **保存ボタンがスクロールの中に埋まっていた。**
+        中身の欄は `.mo-bd`（max-height:66vh・スクロール）の中。
+        いちばん下の「保存する」は iPad だとかなりスクロールしないと出てこない。
+        いつも見えている足もと（`.mo-ft`）にも同じボタンを出す。 */
+  const kFSave=document.getElementById("k-fsave");
+  const kSetEditing=on=>{
+    if(kFSave) kFSave.style.display=on?"":"none";
+    const be=document.getElementById("k-edit");
+    if(be) be.textContent=on?"直すのをやめる":"この内容を直す";
+  };
   document.getElementById("k-edit").onclick=()=>{
     const box=document.getElementById("k-form");
-    if(box.innerHTML){ box.innerHTML=""; return; }
+    if(box.innerHTML){ box.innerHTML=""; kSetEditing(false); return; }
     // v129：材料・プレゼント・キャンペーンもここで直せる。
     // Squareから自動でできたカルテは、この画面しか通らないため
     const kebox=(kind,label,note)=>`
@@ -3150,7 +3180,7 @@ function openKarteModal(id){
           長辺640pxに縮めて保存します。1枚のカルテに${KPHOTO_MAX}枚まで。</span></div>
       </div>
       <p class="note" data-kecost style="margin:10px 0 0"></p>
-      <div class="actions"><button class="btn" id="k-save">保存する</button></div></div>`;
+      <div class="actions"><button class="btn" data-kesave="1">保存する</button></div></div>`;
     const root=box.querySelector("[data-kebox]");
     keMenuDraw(root,kms); keOptDraw(root,kos);
     /* ---------- 編集画面の写真（v198） ----------
@@ -3201,7 +3231,8 @@ function openKarteModal(id){
       keCost(root);
     });
     keCost(root);
-    document.getElementById("k-save").onclick=async()=>{
+    kSetEditing(true);
+    const keSave=async()=>{
       box.querySelectorAll("[data-kf]").forEach(i=>{
         const f=i.dataset.kf;
         if(f==="price"){ k.price=+i.value||0; return; }
@@ -3225,6 +3256,8 @@ function openKarteModal(id){
       if(document.getElementById("kclist")) openCustKarteList(k.cid);  // v158：後ろの一覧も作り直す
       toast("保存しました");
     };
+    root.querySelector("[data-kesave]").onclick=keSave;   // 欄のいちばん下
+    if(kFSave) kFSave.onclick=keSave;                     // いつも見えている足もと
   };
 }
 
