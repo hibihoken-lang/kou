@@ -859,7 +859,7 @@
 /* このファイルの版。ファイル名の番号（salon-de-kou-karte_NN.html）と必ずそろえること。
    仕分け待ちの下書きを捨てるかどうかの判定（BUYVER）にも使うので、
    ここを上げ忘れると、古い読み取りで作られた下書きが生き残る（v87でやらかした） */
-const APPVER=196;
+const APPVER=198;
 const KEY="sdk:data";
 /* ★ v133：QC／SEED／PROD／MENU／QK／CHARTS0／STOCK0／ACTUAL／VISITS は
    **わざと空にしてあります。書き戻さないこと。**
@@ -1786,8 +1786,7 @@ function chartForm(k){
   return `<div class="sheet" id="kform">
     <div class="grid">
       <div><label class="f" for="k-date">施術日</label><input class="f-in" id="k-date" type="date" value="${k?esc(k.date):today()}"></div>
-      <div><label class="f" for="k-staff">担当</label><select class="f-in" id="k-staff">${
-        STAFF.map(s=>`<option${k&&k.staff===s?" selected":""}>${s}</option>`).join("")}</select></div>
+      ${staffSelect(k&&k.staff,'id="k-staff"','k-staff')}
 
       ${KSEC("① お客様のご要望")}
       <div style="grid-column:1/-1"><label class="f" for="k-wish">今日のご要望・気になるところ</label>
@@ -1799,7 +1798,6 @@ function chartForm(k){
       <div style="grid-column:1/-1"><label class="f" for="k-menu">メニュー</label>
         <div id="k-menus"></div>
         <button class="btn quiet" id="k-menu-add" type="button" style="margin-top:6px">メニューの欄を増やす</button>
-        <datalist id="menulist">${MENUS().map(m=>`<option value="${esc(m.n)}" label="${esc(m.cat)}／${m.p?"¥"+m.p.toLocaleString():"都度見積"}">`).join("")}</datalist>
         <div class="picked" id="k-price" style="text-align:left;margin-top:5px"></div>
       </div>
       <div style="grid-column:1/-1"><label class="f" for="k-opt1">オプション</label>
@@ -1851,12 +1849,13 @@ function chartForm(k){
       <div style="grid-column:1/-1"><label class="f" for="k-note">メモ（スタッフの覚え書き）</label><textarea class="f-in" id="k-note" placeholder="会話の内容、体調、気づいたこと など">${v("note")}</textarea></div>
       <div style="grid-column:1/-1"><label class="f">写真（お肌の状態など）</label>
         <div class="actions" style="margin:0">
-          <label class="btn quiet phbtn">画像を選ぶ
-            <input type="file" accept="image/*" id="k-pick"></label>
+          <label class="btn quiet phbtn">この端末の写真から選ぶ
+            <input type="file" accept="image/*" multiple id="k-pick"></label>
           <button class="btn quiet" type="button" id="k-drive">Googleドライブから選ぶ</button>
         </div>
         <div id="k-photos" class="kphotos"></div>
-        <span class="note">長辺640pxに縮めて保存します。1枚のカルテに4枚まで。</span></div>
+        <span class="note"><b>iPad なら「写真ライブラリ」から選べます</b>（ビフォー・アフターを
+          まとめて選べます）。長辺640pxに縮めて保存します。1枚のカルテに${KPHOTO_MAX}枚まで。</span></div>
     </div>
     <div class="actions"><button class="btn" id="k-save">${k?"今日のカルテを更新":"カルテを保存"}</button></div>
   </div>`;
@@ -1868,10 +1867,31 @@ function chartForm(k){
 const KMENU_MAX=3, KOPT_MAX=5;
 /* メニューの1行。id は画面にひとつしか無い側（新規カルテ）だけ付ける。
    直す画面（モーダル）にも同じ欄を出すので、**id がぶつからないように** */
-function menuInput(v,i,id){
-  return `<input class="f-in kmenu" data-km="${i}"${id?` id="${id}"`:""}
-    list="menulist" autocomplete="off" value="${esc(v||"")}"
-    placeholder="${i?"追加のメニュー":"打ち始めるとSquareのメニューから候補が出ます"}"${i?' style="margin-top:6px"':""}>`;
+/* ---------- メニューはプルダウン（v198） ----------
+   利用者の指示：**「カルテのメニューの中のプルダウンがなくなってる。
+   オプションはプルダウンがあって選べるからメニューも同じようにしてほしい。
+   メニューはスクエアにある」**
+
+   v144 まではメニューだけ `<datalist>` つきの打ち込み欄だった。
+   パソコンなら打ち始めると候補が出るが、**iPad の Safari は datalist の候補を
+   キーボードの上に小さく出すだけ**で、指で操作していると気づけない。
+   ＝「プルダウンが無くなった」ように見えていた。オプション（`optSelect`）は
+   ちゃんと `<select>` なので選べていた。**メニューも同じ `<select>` にそろえる。**
+
+   ★ いまカルテに入っている名前が一覧に無いときは、**末尾に足して選択済みにする**
+     （optSelect と同じ作り）。開いて保存しただけで消えることが無いように。 */
+function menuSelect(v,i,id){
+  const ms=TREATMENTS(), val=String(v||"").trim();
+  const extra=val&&!ms.some(m=>MNORM(m.n)===MNORM(val));
+  const cats=[...new Set(ms.map(m=>m.cat||"その他"))];
+  return `<select class="f-in kmenu" data-km="${i}"${id?` id="${id}"`:""}${i?' style="margin-top:6px"':""}>
+    <option value="">（選んでください）</option>
+    ${cats.map(c=>`<optgroup label="${esc(c)}">${
+      ms.filter(m=>(m.cat||"その他")===c).map(m=>
+        `<option value="${esc(m.n)}"${MNORM(m.n)===MNORM(val)?" selected":""}>${esc(m.n)}${
+          m.p?`　¥${m.p.toLocaleString()}`:""}</option>`).join("")}</optgroup>`).join("")}
+    ${extra?`<option value="${esc(val)}" selected>${esc(val)}</option>`:""}
+  </select>`;
 }
 /* オプションの1つぶん（v134）。Squareの「オプション」カテゴリから選ぶ。
    いまカルテに入っている名前がSquareの一覧に無いときは、消えないよう末尾に足しておく */
@@ -1989,6 +2009,31 @@ function drawCamps(list){
    お客様1人あたり何十枚も溜まる場所なので、商品写真（320px）と請求書（1400px）の中間にした。
    画面を開いているあいだだけ持ち、保存時にカルテへ入る */
 let kPhotos=[];
+/* ---------- 担当（v198） ----------
+   利用者の指示：**「カルテの中の担当がデフォでその他になってるけど
+   川口、水野、その他でプルダウンで選択。デフォは川口で川口以外は選びなおすがよい。
+   川口以外はほとんど施術しないから」**
+
+   直したのは2か所。
+     1. **編集画面の担当が打ち込み欄だった**（新規カルテだけプルダウンだった）。
+        Squareから来たカルテはこの画面しか通らないので、
+        「その他」と書かれた文字を手で消して打ち直すしかなかった
+     2. **Squareの取り込みが「その他」を入れていた。**
+        `o.staff` は Square の `created_by_team_member_id`＝**会計を打った人**であって、
+        施術した人ではない。だれが打っても team member が付くので、
+        ほぼ全部が「その他」になっていた。**既定を川口さんに変える**
+
+   ★ すでに取り込みずみのカルテの「その他」は書き換えていない
+     （本当に川口さん以外だったぶんまで塗り替えてしまうため）。この画面で選び直せる。 */
+function staffSelect(cur,attr,forId){
+  const v=String(cur||"").trim(), known=STAFF.includes(v);
+  return `<div><label class="f"${forId?` for="${forId}"`:""}>担当</label>
+    <select class="f-in" ${attr||""}>
+      ${STAFF.map(x=>`<option${x===(known?v:STAFF[0])?" selected":""}>${x}</option>`).join("")}
+      ${(!known&&v)?`<option selected>${esc(v)}</option>`:""}
+    </select></div>`;
+}
+
 const KPHOTO_MAX=4;
 function drawPhotos(){
   const box=document.getElementById("k-photos"); if(!box) return;
@@ -2051,7 +2096,7 @@ const keOptRead =root=>[...root.querySelectorAll("[data-kobox] .kopt")].map(e=>e
 function keMenuDraw(root,list){
   const box=root.querySelector("[data-kmbox]"); if(!box) return;
   const v=(list&&list.length?list.slice(0,KMENU_MAX):[""]);
-  box.innerHTML=v.map((x,i)=>menuInput(x,i,"")).join("");
+  box.innerHTML=v.map((x,i)=>menuSelect(x,i,"")).join("");
   const b=root.querySelector("[data-kmadd]"); if(b) b.style.display=v.length>=KMENU_MAX?"none":"";
 }
 function keOptDraw(root,list){
@@ -2109,7 +2154,7 @@ function kPriceShow(){
 function drawMenuRows(list){
   const box=document.getElementById("k-menus"); if(!box) return;
   const v=(list&&list.length?list.slice(0,KMENU_MAX):[""]);
-  box.innerHTML=v.map((x,i)=>menuInput(x,i,i?"k-menu"+(i+1):"k-menu")).join("");
+  box.innerHTML=v.map((x,i)=>menuSelect(x,i,i?"k-menu"+(i+1):"k-menu")).join("");
   box.querySelectorAll(".kmenu").forEach(e=>{ e.oninput=kPriceShow; e.onchange=kPriceShow; });
   const b=document.getElementById("k-menu-add");
   if(b) b.style.display=v.length>=KMENU_MAX?"none":"";
@@ -2168,12 +2213,21 @@ function bindChartForm(c,k){
   kPhotos=(k&&Array.isArray(k.photos))?k.photos.slice()
          :((prefill&&Array.isArray(prefill.photos))?prefill.photos.slice():[]);
   drawPhotos();
+  /* v198：ビフォー・アフターを一度に選べるよう **まとめて受ける**（multiple）。
+     4枚を超えたぶんは黙って捨てず、何枚入って何枚入らなかったかを知らせる */
   const addPhoto=async e=>{
-    const f=e.target.files&&e.target.files[0]; if(!f) return;
-    if(kPhotos.length>=KPHOTO_MAX){ toast(`写真は${KPHOTO_MAX}枚までです`); e.target.value=""; return; }
-    try{ kPhotos.push(await shrinkImage(f,640,0.72)); drawPhotos(); }
-    catch(err){ toast("写真を読めませんでした："+err.message); }
-    e.target.value="";
+    const fs=[...(e.target.files||[])]; e.target.value="";
+    if(!fs.length) return;
+    let ok=0, over=0, ng=0;
+    for(const f of fs){
+      if(kPhotos.length>=KPHOTO_MAX){ over++; continue; }
+      try{ kPhotos.push(await shrinkImage(f,640,0.72)); ok++; }
+      catch(err){ ng++; }
+    }
+    drawPhotos();
+    toast(`写真を${ok}枚入れました`
+      +(over?`（${KPHOTO_MAX}枚までなので ${over}枚は入りません）`:"")
+      +(ng?`／${ng}枚は読めませんでした`:""));
   };
   document.getElementById("k-pick").onchange=addPhoto;
   /* v134：端末のカメラ（写真を撮る）はやめて、ドライブの写真から選ぶ */
@@ -3058,9 +3112,9 @@ function openKarteModal(id){
       for(let i=kms.length-1;i>=0;i--) if(isOptName(kms[i])) kos.unshift(kms.splice(i,1)[0]);
     // v144：空の欄で埋めない。1つから始めて、ボタンで増やす
     box.innerHTML=`<div class="sheet" style="margin-top:8px" data-kebox="1"><div class="grid">
-      ${[["date","施術日","date"],["staff","担当","text"]].map(([f,l,t])=>
-        `<div><label class="f">${l}</label>
-          <input class="f-in" data-kf="${f}" type="${t}" value="${esc(k[f]||"")}"></div>`).join("")}
+      <div><label class="f">施術日</label>
+        <input class="f-in" data-kf="date" type="date" value="${esc(k.date||"")}"></div>
+      ${staffSelect(k.staff,'data-kf="staff"')}
       <div style="grid-column:1/-1"><label class="f">メニュー</label>
         <div data-kmbox="1"></div>
         <button class="btn quiet" type="button" data-kmadd="1" style="margin-top:6px">メニューの欄を増やす</button></div>
@@ -3085,11 +3139,58 @@ function openKarteModal(id){
         <textarea class="f-in" data-kf="wish">${esc(k.wish||"")}</textarea></div>
       <div style="grid-column:1/-1"><label class="f">メモ（スタッフの覚え書き）</label>
         <textarea class="f-in" data-kf="note">${esc(k.note||"")}</textarea></div>
+      <div style="grid-column:1/-1"><label class="f">写真（ビフォー・アフターなど）</label>
+        <div class="actions" style="margin:0">
+          <label class="btn quiet phbtn">この端末の写真から選ぶ
+            <input type="file" accept="image/*" multiple data-kepick="1"></label>
+          <button class="btn quiet" type="button" data-kedrive="1">Googleドライブから選ぶ</button>
+        </div>
+        <div data-kephotos="1" class="kphotos"></div>
+        <span class="note"><b>iPad なら「写真ライブラリ」から選べます。</b>
+          長辺640pxに縮めて保存します。1枚のカルテに${KPHOTO_MAX}枚まで。</span></div>
       </div>
       <p class="note" data-kecost style="margin:10px 0 0"></p>
       <div class="actions"><button class="btn" id="k-save">保存する</button></div></div>`;
     const root=box.querySelector("[data-kebox]");
     keMenuDraw(root,kms); keOptDraw(root,kos);
+    /* ---------- 編集画面の写真（v198） ----------
+       利用者の指示：**「カルテにお客様のビフォアフターの写真を
+       iPadの保存から取り込みたいけど作って」**
+
+       写真の欄は**新規カルテにしか無かった。** Squareから自動でできたカルテは
+       この編集画面しか通らないので（v129のおぼえがき）、
+       **来店ぶんのカルテに後から写真を足す道が1本も無かった。** ここで足す。
+       中身は新規カルテと同じ（長辺640pxのJPEG・4枚まで・保存のときドライブへ移す）。 */
+    let kePhotos=(Array.isArray(k.photos)?k.photos.slice():[]);
+    const keDrawPhotos=()=>{
+      const bx=root.querySelector("[data-kephotos]"); if(!bx) return;
+      bx.innerHTML=kePhotos.map((d,i)=>
+        `<figure>${phTag(d,"カルテの写真"+(i+1))}<button type="button" data-kephx="${i}" aria-label="消す">×</button></figure>`).join("");
+      bx.querySelectorAll("[data-kephx]").forEach(b=>b.onclick=()=>{
+        kePhotos.splice(+b.dataset.kephx,1); keDrawPhotos(); });
+      fillPhotos();
+    };
+    keDrawPhotos();
+    const kePick=root.querySelector("[data-kepick]");
+    if(kePick) kePick.onchange=async e=>{
+      const fs=[...(e.target.files||[])]; e.target.value="";
+      if(!fs.length) return;
+      let ok=0, over=0, ng=0;
+      for(const f of fs){
+        if(kePhotos.length>=KPHOTO_MAX){ over++; continue; }
+        try{ kePhotos.push(await shrinkImage(f,640,0.72)); ok++; }
+        catch(err){ ng++; }
+      }
+      keDrawPhotos();
+      toast(`写真を${ok}枚入れました`
+        +(over?`（${KPHOTO_MAX}枚までなので ${over}枚は入りません）`:"")
+        +(ng?`／${ng}枚は読めませんでした`:""));
+    };
+    const keDrv=root.querySelector("[data-kedrive]");
+    if(keDrv) keDrv.onclick=()=>openDrivePicker(d=>{
+      if(kePhotos.length>=KPHOTO_MAX){ toast(`写真は${KPHOTO_MAX}枚までです`); return false; }
+      kePhotos.push(d); keDrawPhotos(); return true;
+    });
     root.querySelector("[data-kmadd]").onclick=()=>keMenuDraw(root,keMenuRead(root).concat([""]));
     root.querySelector("[data-koadd]").onclick=()=>keOptDraw(root,keOptRead(root).concat([""]));
     ["mats","gifts","camps","sales"].forEach(kind=>
@@ -3112,6 +3213,8 @@ function openKarteModal(id){
       const ms=[...root.querySelectorAll("[data-km]")].map(e=>e.value.trim()).filter(Boolean);
       const os=[...root.querySelectorAll(".kopt")].map(e=>e.value.trim()).filter(Boolean);
       k.menus=ms; k.opts=os; k.menu=joinMenu(ms,os);
+      // v198：写真。0枚のときは持たせない（空の配列を残さない）
+      if(kePhotos.length) k.photos=kePhotos.slice(); else delete k.photos;
       ["mats","gifts","camps","sales"].forEach(kind=>{
         const v=keRead(root.querySelector(`[data-ke="${kind}"]`),kind);
         if(v.length) k[kind]=v; else delete k[kind];
@@ -3354,6 +3457,24 @@ function OPTIONS(){
     const k=MNORM(n); if(seen.has(k)) return; seen.add(k); out.push({n,p:+p||0}); };
   Object.values(((db.sqcat||{}).map)||{}).forEach(x=>add(x.n,x.p,x.cat));
   MENUS().forEach(m=>add(m.n,m.p,m.cat));
+  return out;
+}
+/* ---------- 施術メニューの選択肢（v198） ----------
+   オプション（`OPTIONS`）と対になるもの。**オプションでも物販でもない品目**が施術メニュー。
+   出どころは OPTIONS と同じで、どちらも元は Square。
+   ・`db.sqcat`＝取り込みのたびに `relayGet("menu")` で入れ直す控え。いちばん新しい姿
+   ・`db.menu`＝メニュー一覧。控えがまだ無いときの受け皿
+   カテゴリで束ねて `<optgroup>` に出すので、95件あっても指で探せる。 */
+function TREATMENTS(){
+  const out=[], seen=new Set();
+  const add=(n,p,cat,retail)=>{
+    n=String(n||"").trim();
+    if(!n||OPTCAT(cat)||retail) return;          // オプションと物販は入れない
+    const k=MNORM(n); if(seen.has(k)) return;
+    seen.add(k); out.push({n,p:+p||0,cat:String(cat||"").trim()});
+  };
+  Object.values(((db.sqcat||{}).map)||{}).forEach(x=>add(x.n,x.p,x.cat,x.r));
+  MENUS().forEach(m=>add(m.n,m.p,m.cat,false));
   return out;
 }
 /* 名前からメニュー（またはオプション）の値段を引く。3つのメニューと5つのオプションを足すため */
@@ -8269,7 +8390,11 @@ async function syncOrders(from,to,opt){
     // Squareで名前を変えた商品がカルテでは商品と見なされず、メニュー欄に出ていた。
     // 売れた数のほうは v108 からIDで拾っているので、2つの見分け方が食い違っていた
     const k={id:uid(),cid:c.id,date:o.date,
-      staff:o.staff?"その他":"川口香子",
+      /* v198：既定は川口さん。`o.staff` は Square の created_by_team_member_id ＝
+         **会計を打った人**で、施術した人ではない。だれが打っても付くので、
+         これで分けると事実上ぜんぶ「その他」になっていた。
+         川口さん以外が施術したときは、カルテの編集画面で選び直す */
+      staff:"川口香子",
       menu:joinMenu(menus,opts), menus:menus, opts:opts,
       price:o.total, parts:"",machine:"",level:"",shots:"",skin:"",
       goods:gd.map(nm).join("／"), sales:sales,
