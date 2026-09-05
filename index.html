@@ -338,6 +338,18 @@
   .phbtn{position:relative;overflow:hidden;cursor:pointer;font-size:12px;padding:7px 13px}
   .phbtn input{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%}
 
+  /* v202：1文字で絞り込む候補の一覧（予定のお客様名）。
+     datalist はパソコンでしか使いものにならないので、自前で出す */
+  .pickbox{margin-top:5px;border:1px solid var(--line);border-radius:9px;background:var(--card);
+           max-height:210px;overflow:auto}
+  .pickbox button{display:block;width:100%;text-align:left;background:none;border:0;
+                  border-bottom:1px solid var(--line);padding:9px 12px;cursor:pointer;
+                  font:inherit;font-size:13px;color:var(--ink)}
+  .pickbox button:last-child{border-bottom:0}
+  .pickbox button:hover,.pickbox button:focus{background:var(--accent-soft)}
+  .pickbox button small{display:block;color:var(--ink3);font-size:11px;margin-top:1px}
+  .pickbox .none{padding:9px 12px;font-size:12px;color:var(--ink3)}
+
   .matrow{display:flex;align-items:center;gap:8px;margin-bottom:6px}
   .matrow .mat-p{flex:1;min-width:0}
   .matrow .mat-q{width:70px;text-align:right;font-family:var(--mono)}
@@ -859,7 +871,7 @@
 /* このファイルの版。ファイル名の番号（salon-de-kou-karte_NN.html）と必ずそろえること。
    仕分け待ちの下書きを捨てるかどうかの判定（BUYVER）にも使うので、
    ここを上げ忘れると、古い読み取りで作られた下書きが生き残る（v87でやらかした） */
-const APPVER=200;
+const APPVER=202;
 const KEY="sdk:data";
 /* ★ v133：QC／SEED／PROD／MENU／QK／CHARTS0／STOCK0／ACTUAL／VISITS は
    **わざと空にしてあります。書き戻さないこと。**
@@ -2551,6 +2563,9 @@ const OFFTIME={am:{start:"09:00",dur:240},pm:{start:"13:00",dur:360},private:{st
 /* お客様の予約として数えるか。**集計はすべてこれを通すこと** */
 const isBooking=a=>!!a&&!a.allday&&!a.off&&a.status!=="cancel";
 
+/* 「一覧にない（直接入力）」を表す印。ふつうのメニュー名とぶつからない文字にしてある */
+const MENUFREE="　一覧にない　";
+
 function drawApForm(){
   const a=apEdit, box=document.getElementById("apf");
   if(!box) return;
@@ -2563,8 +2578,11 @@ function drawApForm(){
         </select>
         ${a.off?`<span class="note">お客様の予約ではないので、<b>来店者数にも売上の見込みにも数えません</b>。</span>`:""}</div>
       <div style="grid-column:1/-1${a.off?";display:none":""}"><label class="f" for="a-name">お客様・件名</label>
-        <input class="f-in" id="a-name" list="custlist" autocomplete="off" value="${esc(a.name)}" placeholder="名簿から選ぶ／新規や休暇は直接入力">
-        <datalist id="custlist">${db.customers.map(c=>`<option value="${esc(c.name)}" label="${esc(c.tel||"")}">`).join("")}</datalist></div>
+        <input class="f-in" id="a-name" autocomplete="off" value="${esc(a.name)}"
+          placeholder="1文字入れると名簿から候補が出ます／新規のお客様や休暇は直接入力">
+        <div class="pickbox" id="a-namehits" style="display:none"></div>
+        <span class="note">お名前・ふりがな・電話のどれでも探せます。
+          <b>名簿にいない方は、そのまま打てば新規として保存できます。</b></span></div>
       <div><label class="f" for="a-date">日付</label><input class="f-in" id="a-date" type="date" value="${a.date}"></div>
       <div style="${a.off?"display:none":""}"><label class="f" for="a-kind">区分</label><select class="f-in" id="a-kind">
         ${["再来","新規"].map(k=>`<option${k===a.kind?" selected":""}>${k}</option>`).join("")}</select></div>
@@ -2577,11 +2595,15 @@ function drawApForm(){
         ${SRC.map(s=>`<option${s===a.src?" selected":""}>${s}</option>`).join("")}</select></div>
       <div><label class="f" for="a-start">開始</label><input class="f-in" id="a-start" type="time" step="900" value="${a.start}" ${a.allday?"disabled":""}></div>
       <div><label class="f" for="a-dur">所要（分）</label><input class="f-in" id="a-dur" type="number" min="15" step="15" value="${a.dur}" ${a.allday?"disabled":""}></div>
-      <div style="grid-column:1/-1${a.off?";display:none":""}"><label class="f" for="a-menu">メニュー</label>
-        <input class="f-in" id="a-menu" list="menulist2" autocomplete="off" value="${esc(a.menu)}" placeholder="打ち始めるとSquareのメニューから候補が出ます">
-        <span class="note">来店して急に変わったときは、ここを書き直して保存してください。
-          <b>直した欄は、次のホットペッパーのメール取り込みで上書きしません。</b></span>
-        <datalist id="menulist2">${MENUS().map(m=>`<option value="${esc(m.n)}" label="${esc(m.cat)}／${m.p?"¥"+m.p.toLocaleString():"都度見積"}">`).join("")}</datalist></div>
+      <div style="grid-column:1/-1${a.off?";display:none":""}"><label class="f" for="a-mcat">メニュー</label>
+        <select class="f-in" id="a-mcat" style="margin-bottom:6px"></select>
+        <select class="f-in" id="a-menu"></select>
+        <input class="f-in" id="a-menufree" style="margin-top:6px;display:none"
+          placeholder="一覧にないメニューを直接入力" value="">
+        <span class="note"><b>まずカテゴリを選び、その中から選びます。</b>
+          一覧にないときは、いちばん下の「一覧にない（直接入力）」を選ぶと打ち込めます。<br>
+          来店して急に変わったときは、ここを選び直して保存してください。
+          <b>直した欄は、次のホットペッパーのメール取り込みで上書きしません。</b></span></div>
       <div style="grid-column:1/-1"><label class="f" for="a-note">メモ</label><input class="f-in" id="a-note" value="${esc(a.note)}"></div>
       <div style="grid-column:1/-1"><label style="font-size:13px;color:var(--ink2);cursor:pointer">
         <input type="checkbox" id="a-all" ${a.allday?"checked":""}> 終日の予定にする（休暇日など）</label>
@@ -2601,7 +2623,7 @@ function drawApForm(){
     const g=id=>{const e=document.getElementById(id); return e?e.value:"";};
     return {name:g("a-name"), date:g("a-date"), start:g("a-start"),
             dur:+g("a-dur")||60, staff:g("a-staff"), kind:g("a-kind"),
-            menu:g("a-menu"), src:g("a-src"), note:g("a-note")};
+            menu:apMenuValue(), src:g("a-src"), note:g("a-note")};   // v202
   };
   document.getElementById("a-off").onchange=e=>{
     const k=e.target.value;
@@ -2623,15 +2645,114 @@ function drawApForm(){
   document.getElementById("a-staff").onchange=chip;
   document.getElementById("a-kind").onchange=chip;
   document.getElementById("a-all").onchange=e=>{ st.disabled=dur.disabled=e.target.checked; };
-  document.getElementById("a-menu").oninput=e=>{
-    const m=MENUS().find(x=>x.n===e.target.value.trim());
-    if(m) dur.value=m.min||guessDur(m.n);
+  /* ---------- メニューはカテゴリから選ぶ（v202） ----------
+     利用者の指示：**「メニューを選ぶときカテゴリーから選択していきたいから修正して」**
+
+     打ち込み欄＋`<datalist>` だった。パソコンなら打つと候補が出るが、
+     **iPad の Safari は候補をキーボードの上に小さく出すだけ**なので指では拾えない
+     （カルテのメニューを v198 で `<select>` にしたのと同じ落とし穴）。
+     メニューは95件あって1枚のプルダウンでは長いので、**カテゴリ → メニュー**の2段にする。
+
+     ★ いま入っている名前が一覧に無いとき（ホットペッパーのメールから来た
+       「◯◯／△△」のような組み合わせなど）は**消さない。**
+       そのままの文字を末尾に足して選択済みにする。
+     ★ どうしても一覧に無いものを入れたいときのために
+       「一覧にない（直接入力）」を残してある。選ぶと下に打ち込み欄が出る。 */
+  const mcat=document.getElementById("a-mcat"), msel=document.getElementById("a-menu"),
+        mfree=document.getElementById("a-menufree");
+  /* いまメニュー欄が指している値。直接入力に切りかえているときはそちらを読む */
+  window.apMenuValue=()=>{
+    if(!msel) return "";
+    return msel.value===MENUFREE ? String(mfree?mfree.value:"").trim() : msel.value;
   };
-  document.getElementById("a-name").onchange=e=>{
-    const c=db.customers.find(x=>x.name===e.target.value.trim());
-    document.getElementById("a-kind").value=(c&&chartsOf(c.id).length)?"再来":"新規";
+  if(mcat&&msel){
+    const all=MENUS().filter(m=>m.n);
+    const cur=String(a.menu||"").trim();
+    const hit=all.find(m=>MNORM(m.n)===MNORM(cur));
+    const cats=[...new Set(all.map(m=>String(m.cat||"").trim()||"その他"))];
+    const drawCat=()=>{
+      mcat.innerHTML=`<option value="">（すべてのカテゴリ）</option>`
+        +cats.map(c=>`<option value="${esc(c)}"${
+          hit&&(String(hit.cat||"").trim()||"その他")===c?" selected":""}>${esc(c)}</option>`).join("");
+    };
+    const drawMenu=(keep)=>{
+      const c=mcat.value;
+      const list=c?all.filter(m=>(String(m.cat||"").trim()||"その他")===c):all;
+      const v=keep===undefined?cur:keep;
+      const inList=list.some(m=>MNORM(m.n)===MNORM(v));
+      msel.innerHTML=`<option value="">（選んでください）</option>`
+        +list.map(m=>`<option value="${esc(m.n)}"${MNORM(m.n)===MNORM(v)?" selected":""}>${esc(m.n)}${
+          m.p?`　¥${m.p.toLocaleString()}`:""}</option>`).join("")
+        +(v&&!inList?`<option value="${esc(v)}" selected>${esc(v)}（いま入っているもの）</option>`:"")
+        +`<option value="${MENUFREE}">一覧にない（直接入力）</option>`;
+      if(mfree) mfree.style.display="none";
+    };
+    drawCat(); drawMenu();
+    mcat.onchange=()=>drawMenu("");
+    msel.onchange=()=>{
+      if(msel.value===MENUFREE){
+        if(mfree){ mfree.style.display=""; mfree.focus(); }
+        return;
+      }
+      if(mfree) mfree.style.display="none";
+      const m=MENUS().find(x=>MNORM(x.n)===MNORM(msel.value));
+      if(m&&dur) dur.value=m.min||guessDur(m.n);
+    };
+  }
+
+  /* ---------- お客様は1文字で絞り込む（v202） ----------
+     利用者の指示：**「スケジュールから名前、メニューを手入力する場合、
+     一文字入れたら候補を絞って選択できるようにしてほしい」**
+
+     ここも `<datalist>` だった。**名簿は283名**あるので、iPad で候補が出ないと
+     全部打つしかない。自前で一覧を出す。
+     ・**1文字から**出る（お名前・ふりがな・電話のどれでも当たる）
+     ・多いときは12件まで。押すと欄に入って、区分（新規／再来）も自動で決まる
+     ・**打ちっぱなしでも保存できる**（名簿にいない新規のお客様・休暇の件名） */
+  const nin=document.getElementById("a-name"), nbox=document.getElementById("a-namehits");
+  const nameKind=()=>{
+    const c=db.customers.find(x=>x.name===String(nin.value).trim());
+    const ki=document.getElementById("a-kind");
+    if(ki) ki.value=(c&&chartsOf(c.id).length)?"再来":"新規";
     chip();
   };
+  if(nin&&nbox){
+    const hide=()=>{ nbox.style.display="none"; nbox.innerHTML=""; };
+    const show=()=>{
+      const q=KNORM(nin.value);
+      if(!q){ hide(); return; }
+      const num=q.replace(/[^0-9]/g,"");
+      const hits=db.customers.filter(c=>
+        KNORM(c.name).includes(q)||KNORM(c.kana||"").includes(q)
+        ||(num.length>=3&&String(c.tel||"").replace(/[^0-9]/g,"").includes(num)))
+        /* 頭から一致した人を先に出す。「さ」で「服部正典（ハットリマサノリ）」が
+           先頭に来ると探しているものが見つけにくい */
+        .sort((x,y)=>{
+          const h=c=>(KNORM(c.name).startsWith(q)||KNORM(c.kana||"").startsWith(q))?0:1;
+          return h(x)-h(y)||x.name.localeCompare(y.name,"ja");
+        });
+      if(!hits.length){
+        nbox.innerHTML=`<div class="none">名簿に見あたりません。<b>このまま保存すれば新規のお客様になります。</b></div>`;
+        nbox.style.display=""; return;
+      }
+      nbox.innerHTML=hits.slice(0,12).map(c=>{
+        const n=chartsOf(c.id).length;
+        return `<button type="button" data-pick="${esc(c.id)}">${esc(c.name)}
+          <small>${[c.kana||"",c.tel||"",n?`カルテ${n}件`:"はじめて"].filter(Boolean).join("　")}</small></button>`;
+      }).join("")+(hits.length>12?`<div class="none">ほか ${hits.length-12}名。もう少し打つと絞れます</div>`:"");
+      nbox.style.display="";
+      nbox.querySelectorAll("[data-pick]").forEach(b=>b.onclick=()=>{
+        const c=db.customers.find(x=>x.id===b.dataset.pick);
+        if(c){ nin.value=c.name; nameKind(); }
+        hide();
+      });
+    };
+    nin.oninput=show;
+    nin.onfocus=show;
+    nin.onchange=nameKind;
+    /* 欄の外を押したら閉じる。候補そのものを押したときは onclick が先に走る */
+    nin.onblur=()=>setTimeout(hide,180);
+  }
   document.getElementById("a-save").onclick=async()=>{
     const g=id=>document.getElementById(id).value.trim();
     if(!g("a-name")){ toast("お客様のお名前または件名を入れてください"); return; }
@@ -2639,7 +2760,7 @@ function drawApForm(){
     const hit=db.customers.find(c=>c.name===g("a-name"));
     const o={id:a.id||uid(), cid:hit?hit.id:null, name:g("a-name"), date:g("a-date"),
              start:all?"":g("a-start"), dur:all?0:(+g("a-dur")||60), staff:g("a-staff"),
-             kind:g("a-kind"), menu:g("a-menu"), src:g("a-src"), note:g("a-note"), allday:all,
+             kind:g("a-kind"), menu:apMenuValue(), src:g("a-src"), note:g("a-note"), allday:all,   // v202
              off:g("a-off")};
     const was=a.id?db.appts.find(x=>x.id===a.id):null;
     if(was){
@@ -3518,6 +3639,12 @@ function menuPrice(n){
   const o=OPTIONS().find(x=>MNORM(x.n)===k);
   return o?+o.p||0:0;
 }
+/* ひらがな・カタカナのゆれも無視して探す（v202）。
+   名簿のふりがなは**カタカナ**で入っている（ヤマシタアイキ）。
+   iPadで「やま」と打ってもカタカナのふりがなに当たらないと、
+   1文字で絞り込む意味が無い。MNORM（NFKCで半角カナも直る）のあと、
+   カタカナをひらがなに寄せてから比べる。 */
+const KNORM=s=>MNORM(s).replace(/[ァ-ヶ]/g,c=>String.fromCharCode(c.charCodeAt(0)-0x60));
 /* 全角半角・空白・記号ゆれを無視して名前を突き合わせる */
 const MNORM=s=>String(s||"").normalize("NFKC").replace(/[\s*✳・･\uFE0E\uFE0F]/g,"").toLowerCase();
 
