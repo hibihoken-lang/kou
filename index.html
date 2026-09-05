@@ -255,6 +255,10 @@
            font-family:var(--mono);font-size:9px;padding:1px 5px;border-radius:3px;z-index:6}
 
   .cbody{display:flex;max-height:440px;overflow-y:auto}
+  /* v196：iOS Safari は cursor:pointer が無い普通の div に click を配らない。
+     月表示のマス（.mc）には付いていて iPad で押せたのに、週・日表示の時間帯には
+     付いていなかった。これが「iPadで時間帯をタップしても入力欄が出ない」の正体 */
+  .cbody .cday,.allday .cday{cursor:pointer;-webkit-tap-highlight-color:rgba(0,0,0,.06)}
   .hr{height:44px;border-top:1px solid var(--line);position:relative}
   .hr::after{content:"";position:absolute;left:0;right:0;top:21px;border-top:1px dotted var(--line);opacity:.65}
   .cax .hr{border-top:1px solid transparent;display:flex;align-items:center;
@@ -855,7 +859,7 @@
 /* このファイルの版。ファイル名の番号（salon-de-kou-karte_NN.html）と必ずそろえること。
    仕分け待ちの下書きを捨てるかどうかの判定（BUYVER）にも使うので、
    ここを上げ忘れると、古い読み取りで作られた下書きが生き残る（v87でやらかした） */
-const APPVER=194;
+const APPVER=196;
 const KEY="sdk:data";
 /* ★ v133：QC／SEED／PROD／MENU／QK／CHARTS0／STOCK0／ACTUAL／VISITS は
    **わざと空にしてあります。書き戻さないこと。**
@@ -1250,6 +1254,7 @@ function normalizeDb(){
   if(!db.sqsales) db.sqsales={};             // Squareの売上（月→{yen,n,days,items,at}）v78〜／items は v94〜
   if(!db.sqcat) db.sqcat={at:"",map:{}};     // Squareのカタログの控え（品名→カテゴリ・物販かどうか）v94〜
   if(!db.sqsold) db.sqsold={};               // Squareで売れた数の控え（月→{商品ID:個数}）v134〜
+  if(!db.sqinv) db.sqinv={at:"",n:0,map:{},miss:[],tracked:0};  // Squareの在庫数の控え（v196〜）
   if(!db.pay) db.pay={rate:0.4, partRate:0.4, mizuWage:1200, months:{}};  // 支払明細の設定（v110〜／partRateはv111〜）
   if(!db.mimi) db.mimi={cat:"耳ツボジュエリー",unit:1000,on:true};  // 場所代方式（v109〜）
   if(!db.sqskip) db.sqskip={};               // 「Squareのこれとアプリのこれは別物」と決めた組（v108〜）
@@ -2427,16 +2432,18 @@ function renderSched(){
       el.querySelector(".allday").style.paddingRight=sb+"px";
     }
 
-    el.querySelectorAll(".cbody .cday").forEach(col=>col.onclick=e=>{
+    /* v196：click ではなく tapOn（pointerup）。iPad でも反応させるため。
+       予約の札（.ev）の上は enableDrag が受け持つので、ここでは何もしない */
+    el.querySelectorAll(".cbody .cday").forEach(col=>tapOn(col,e=>{
       if(e.target.closest(".ev")) return;
       const y=e.clientY-col.getBoundingClientRect().top;
       const min=Math.round((OPEN*60+y/PXH*60)/15)*15;
       openAp({date:col.dataset.d,start:toHM(Math.min(min,CLOSE*60-60))});
-    });
-    el.querySelectorAll(".allday .cday").forEach(col=>col.onclick=e=>{
+    }));
+    el.querySelectorAll(".allday .cday").forEach(col=>tapOn(col,e=>{
       if(e.target.closest(".off")) return;
       openAp({date:col.dataset.d,allday:true,off:"day",name:OFFLBL("day"),kind:"再来"});
-    });
+    }));
   }
 
   el.querySelectorAll(".off,.mi").forEach(b=>b.onclick=ev=>{
@@ -2469,6 +2476,11 @@ function openAp(a){
   apEdit=Object.assign({id:null,cid:null,name:"",date:schDate,start:"10:00",dur:60,
     staff:STAFF[0],menu:"",src:"HPB",kind:"再来",allday:false,note:"",off:""},a||{});
   drawApForm();
+  /* v196：入力欄はカレンダーの**下**に出る。iPad は画面が狭くて表の下まで見えないので、
+     タップしたのに何も起きていないように見えていた。開いたら見えるところまで送る */
+  const box=document.getElementById("apf");
+  if(box&&typeof box.scrollIntoView==="function")
+    requestAnimationFrame(()=>box.scrollIntoView({behavior:"smooth",block:"center"}));
 }
 
 /* ---------- 予定の種類（v122） ----------
@@ -3209,6 +3221,39 @@ function drawApModal(){
   document.getElementById("mo-hist").onclick=()=>goKarte("hist");
 }
 
+/* ---------- 指でも押せるようにする（v196） ----------
+   利用者の指摘：**「パソコンではスケジュールの時間帯でクリックしたら入力できたが、
+   iPad（タッチパネル）では反応しない」**
+
+   原因は click のほう。iOS の Safari は、リンクでもボタンでもない普通の <div> に
+   click を配らない。配るかどうかの見分けに **cursor:pointer** を使っている。
+   月表示のマス（`.mc`）には cursor:pointer が付いていたので iPad でも押せていたが、
+   週・日表示の時間帯（`.cbody .cday`）には付いていなかった。
+
+   直しは2つ重ねてある。
+     1. CSS に `cursor:pointer` を足す（iOS に「押せる」と教える）
+     2. click ではなく **pointerup** で拾う（マウスも指も同じ道を通る）
+   2 のほうが確実なので、click は使わずに置き換えた。
+
+   ★ 表は縦にスクロールする。指を滑らせたときに予約の入力欄が開いてしまわないよう、
+     **動いた距離が10px以内・押していた時間が700ms以内**のときだけタップとみなす。
+     スクロールが始まると pointercancel が来るので、そこでも取り消している。 */
+function tapOn(el,fn){
+  let x0=0,y0=0,t0=0,id=null;
+  el.addEventListener("pointerdown",e=>{
+    if(e.button&&e.button!==0){ id=null; return; }
+    x0=e.clientX; y0=e.clientY; t0=Date.now(); id=e.pointerId;
+  },{passive:true});
+  el.addEventListener("pointerup",e=>{
+    if(id===null||e.pointerId!==id) return;
+    id=null;
+    if(Math.abs(e.clientX-x0)>10||Math.abs(e.clientY-y0)>10) return;   // スクロールした
+    if(Date.now()-t0>700) return;                                      // 長押しだった
+    fn(e);
+  });
+  el.addEventListener("pointercancel",()=>{ id=null; });
+}
+
 /* 長押しで予約をつかんで、別の時間・別の日へ動かす */
 function enableDrag(root,days){
   let st=null;
@@ -3751,6 +3796,91 @@ function renderMat(){ renderInv(); }
    **上＝数えるもの／下＝数えなくてよいもの**の1枚にした。境目に線と一言を入れ、
    下は薄い灰色で沈める。`cntAll` は使わなくなったが、外の検査から見えるので残す */
 let cntAll=false;
+/* ---------- Squareの在庫数を読む（v196） ----------
+   利用者の指示：**「スクエアで商品在庫を入力したから在庫をスクエアと連携してほしい。
+   また消耗品へ繰入したり、スタッフ購入は今のように原価管理したい。
+   そうなるとアプリでは原価の管理だけになって…」**
+
+   ★ この改修で何が変わって、何が変わらないか
+     変わる   … **物販の「いくつ残っているか」の出どころが Square になる。**
+                読むだけで、Square の在庫はアプリからは動かさない
+     変わらない … 原価（仕入単価）はアプリが持つ。**消耗品へ繰入・スタッフ購入・
+                材料の使用は今までどおりアプリで入力**する。金額はぜんぶアプリで出す
+
+   ★ 入れ先を「棚卸しの実数（cnt）」にした理由
+     月末在庫は `endQty = 帳簿(open+in-sold-gift-use-staff) − loss` で出ている。
+     実数を入れると `loss = 帳簿 − 実数` が入るので、**月末在庫はそのまま実数になる**。
+     つまり cnt に入れるだけで「Squareの数が月末在庫」になり、
+     **データの形を1つも変えずに**Squareを在庫の正としてあつかえる。
+     川口さんが入れた数字も、過去の月も、いっさい動かない。
+
+   ★ 引き当ての順番は バリエーションID → 品目ID → 品名。
+     ID で当たったものが確かで、品名は最後の手段（Squareと同じ名前のときだけ当たる）。
+     当たらなかったものは触らない（黙って0にしない）。 */
+async function syncInventory(){
+  const j=await relayGet("inventory");
+  const list=j.counts||[];
+  const byVar={}, byItem={}, byName={};
+  list.forEach(x=>{
+    if(x.qty===null||x.qty===undefined) return;      // 追跡していない品。0と取り違えない
+    const q=+x.qty||0;
+    byVar[x.v]=(byVar[x.v]||0)+q;
+    if(x.item) byItem[x.item]=(byItem[x.item]||0)+q;
+    const k=MNORM(x.name); if(k) byName[k]=(byName[k]||0)+q;
+  });
+  const map={}, miss=[];
+  db.products.forEach(p=>{
+    if(p.kind!=="物販") return;                      // 材料・消耗品はSquareに在庫が無い
+    const vs=(p.sqvar||[]).filter(v=>byVar[v]!==undefined);
+    let q=null, how="";
+    if(vs.length){ q=vs.reduce((a,v)=>a+byVar[v],0); how="バリエーション"; }
+    else if(p.sqid&&byItem[p.sqid]!==undefined){ q=byItem[p.sqid]; how="品目"; }
+    else if(byName[MNORM(p.n)]!==undefined){ q=byName[MNORM(p.n)]; how="品名"; }
+    if(q===null){ miss.push(p.n); return; }
+    map[p.id]={q:Math.round(q),how};
+  });
+  db.sqinv={at:today(),n:Object.keys(map).length,map,miss:miss.slice(0,60),
+            tracked:Object.keys(byVar).length};
+  await save();
+  return db.sqinv;
+}
+/* その商品のSquare在庫（物販で、引き当てられたものだけ数を返す） */
+function sqInvOf(p){
+  if(!p||p.kind!=="物販") return null;
+  const v=((db.sqinv||{}).map||{})[p.id];
+  return v?Math.round(+v.q||0):null;
+}
+
+/* 棚卸しの画面に出す「Squareの在庫」の案内（v196）。
+   読むボタンと、読んだ数を実数に入れるボタンの2段。
+   ★ 読むだけでは在庫の数字は1つも動かない。動くのは2つめを押したときだけ。
+     （このアプリの決まりごと：**反映は人が押す**。誤読が在庫と原価に直行しないように） */
+function sqBoxHtml(all){
+  const iv=db.sqinv||{}, got=all.filter(r=>r.sq!==null);
+  const diff=got.filter(r=>!(r.has&&(+r.c.cnt||0)===r.sq));
+  const goods=all.filter(r=>r.p.kind==="物販").length;
+  return `<div class="bd" style="margin:0 0 14px">
+    <div class="bdhead"><b>Squareの在庫</b>
+      <span class="sp"></span>
+      <button class="btn quiet" id="ct-sqread" type="button">Squareから在庫数を読む</button>
+      ${got.length?`<button class="btn" id="ct-sqput" type="button">
+        Squareの数を実数に入れる${diff.length?`（${diff.length}品目）`:""}</button>`:""}
+    </div>
+    <p class="note" style="margin:8px 0 0">
+      ${iv.at?`<b>${iv.at.replace(/-/g,"/")}</b> に読みました。
+        物販 ${goods}品目のうち <b>${got.length}品目</b>がSquareと結びついています。`
+             :`<b>まだ一度も読んでいません。</b>「Squareから在庫数を読む」を押してください。`}
+      ${iv.at&&iv.miss&&iv.miss.length?`<br><b style="color:var(--alert)">
+        Squareに見あたらない物販が ${iv.miss.length}品目</b>：${iv.miss.slice(0,8).map(esc).join("／")}${
+        iv.miss.length>8?" ほか":""}
+        <br>これは<b>Squareで在庫を追跡していない</b>か、<b>商品の照合がまだ</b>のどちらかです。
+        照合は「連携」タブ →「商品の照合（Squareのカタログ）」。結びついていないものは触りません`:""}
+      <br><b>読むだけでは在庫の数字は動きません。</b>「実数に入れる」を押したときだけ入ります。
+      Squareの在庫をアプリから書き換えることはありません（<b>読むだけ</b>）。
+      <br><b>材料と消耗品はSquareに在庫が無い</b>ので、今までどおり手で数えてください。</p>
+  </div>`;
+}
+
 function renderCount(){
   const el=document.getElementById(stHost); if(!el) return;
   const kinds=["物販","材料"];
@@ -3758,7 +3888,8 @@ function renderCount(){
   const mk=p=>{
     const c=cell(stMonth,p.id), bk=bookQty(c);
     const has=!(c.cnt===undefined||c.cnt===null||c.cnt==="");
-    return {p,c,bk,has,d:has?(+c.cnt||0)-bk:0,mv:stState(stMonth,p)};
+    return {p,c,bk,has,d:has?(+c.cnt||0)-bk:0,mv:stState(stMonth,p),
+            sq:sqInvOf(p)};                       // v196：Squareの在庫数（無ければ null）
   };
   const all=db.products.filter(p=>kinds.includes(p.kind)).map(mk)
     .filter(r=>!q||(r.p.n+r.p.cat).toLowerCase().includes(q));
@@ -3779,6 +3910,10 @@ function renderCount(){
     <th>${esc(r.p.n)}<br><small style="color:var(--ink3)">${esc(r.p.cat)}　仕入 ${yen(r.p.cost)}</small></th>
     <td><span class="kb" style="background:${KCOL[r.p.kind]}">${r.p.kind}</span></td>
     <td class="${off?"":"hi"}">${r.bk}</td>
+    <td>${r.sq===null?`<span style="color:var(--ink3)">—</span>`
+      :`<b style="font-family:var(--mono)">${r.sq}</b>${
+        r.has&&(+r.c.cnt||0)!==r.sq?`<br><small style="color:var(--alert)">実数と ${
+          ((+r.c.cnt||0)-r.sq)>0?"+":""}${(+r.c.cnt||0)-r.sq}</small>`:""}`}</td>
     <td>${i==null?`<span style="color:var(--ink3)">—</span>`
       :`<input type="number" step="1" data-ct="${r.p.id}" data-i="${i}"
         value="${r.has?+r.c.cnt:""}" placeholder="—"
@@ -3804,15 +3939,17 @@ function renderCount(){
     <p class="note" style="margin:-6px 0 12px">
       <b>数えた実数を入れるだけ。</b>Enter（改行）で次の欄へ移ります。
       入れた数がそのまま月末在庫になります。</p>
+    ${sqBoxHtml(all)}
     <div class="filt">
       <input id="ctq" class="f-in" placeholder="品名で探す" value="${esc(stQ)}" style="max-width:220px">
     </div>
     ${(move.length||none.length)?`<div style="overflow-x:auto"><table class="chk an" style="min-width:440px"><thead><tr>
-        <th style="text-align:left">品名</th><th>区分</th><th>帳簿の月末</th><th>数えた実数</th><th></th>
+        <th style="text-align:left">品名</th><th>区分</th><th>帳簿の月末</th>
+        <th>Squareの在庫</th><th>数えた実数</th><th></th>
       </tr></thead><tbody>
       ${move.length?move.map((r,i)=>line(r,i,false)).join("")
-        :`<tr><td colspan="5" class="how">${q?"見つかりませんでした":"この月に動いたものはありません"}</td></tr>`}
-      ${none.length?`<tr class="ct-sep"><th colspan="5">
+        :`<tr><td colspan="6" class="how">${q?"見つかりませんでした":"この月に動いたものはありません"}</td></tr>`}
+      ${none.length?`<tr class="ct-sep"><th colspan="6">
         <button class="chip${cntAll?" on":""}" id="ct-none" type="button">${
           cntAll?"とじる":`数えなくてよい ${none.length}品目を見る`}</button>
         　先月から動いていないので、<b>月初のまま合っています</b></th></tr>
@@ -3832,6 +3969,32 @@ function renderCount(){
   if(nb) nb.onclick=()=>{ cntAll=!cntAll; renderCount(); };
   document.getElementById("ct-pm").onclick=()=>{ stMonth=shiftMonth(stMonth,-1); renderCount(); };
   document.getElementById("ct-nm").onclick=()=>{ stMonth=shiftMonth(stMonth,1); renderCount(); };
+  /* v196：Squareの在庫を読む／入れる */
+  const sqRead=document.getElementById("ct-sqread");
+  if(sqRead) sqRead.onclick=async()=>{
+    sqRead.disabled=true; sqRead.textContent="Squareから読んでいます…";
+    try{
+      const r=await syncInventory();
+      renderCount();
+      toast(r.n?`Squareの在庫を ${r.n}品目ぶん読みました`
+                :"Squareで在庫を追跡している物販が見つかりませんでした");
+    }catch(e){
+      sqRead.disabled=false; sqRead.textContent="Squareから在庫数を読む";
+      toast("読めませんでした："+e.message);
+    }
+  };
+  const sqPut=document.getElementById("ct-sqput");
+  if(sqPut) sqPut.onclick=async()=>{
+    const t=all.filter(r=>r.sq!==null&&!(r.has&&(+r.c.cnt||0)===r.sq));
+    if(!t.length){ toast("入れ直すものはありません"); return; }
+    if(!confirm(`Squareの在庫数を「数えた実数」に入れます（${t.length}品目）。
+入れた数がそのまま月末在庫になります。
+${t.slice(0,12).map(r=>`　${r.p.n}　${r.has?(+r.c.cnt||0)+" → ":""}${r.sq}`).join("\n")}${t.length>12?"\n　…ほか "+(t.length-12)+"品目":""}
+
+よろしいですか？`))return;
+    t.forEach(r=>{ r.c.cnt=r.sq; r.c.loss=bookQty(r.c)-r.sq; r.c.cntAt=today(); });
+    await save(); renderCount(); toast(`${t.length}品目をSquareの在庫数にそろえました`);
+  };
   document.getElementById("ct-allok").onclick=async()=>{
     const yet=move.filter(r=>!r.has);            // ★下の「動いていない」ぶんは触らない
     if(!yet.length){ toast("まだ数えていないものはありません"); return; }
@@ -8690,6 +8853,7 @@ function renderProdSync(){
 let acctPage="menu";
 /* 年間一覧で内訳を開いている欄。"2026-07|staff" のかたち（"" なら閉じている・v180） */
 let acctOpen="";
+let acctCostOpen="";      // v196：月締めの「原価まとめ」で開いている内訳
 /* ---------- 締めの4つは、ぜんぶ会計タブの中で開く（v190） ----------
    利用者の指摘：**「会計タブから②の仕入れに入ったのに、戻ると連携にしか戻れない」**
 
@@ -8892,6 +9056,61 @@ function acctYearRows(y){
   }
   return {rows, t};
 }
+/* ---------- この月の原価まとめ（v196） ----------
+   利用者の指示：**「アプリでは原価の管理だけになって、月締めの時に
+   物販で売れた商品の原価の合計、スタッフ購入の原価の合計、材料の使った原価の合計が
+   今のスタイルをベースにして管理できるようにしてほしい」**
+
+   3つとも `closing(m)` と `staffYen(m)` が前から出していた数字で、**年間一覧の列にもある。**
+   足りなかったのは「その月を締めるときに、3つが1か所にまとまって見えるところ」だけ。
+   だから計算は1つも変えず、**会計の入口に3枚のタイルを置いた**（年間一覧はそのまま）。
+
+   3つの中身（ここが今までどおりであることが大事）
+     物販原価     … Squareで売れたぶん ＋ 🎁プレゼント ＋ 🎉キャンペーン（支払明細の物販原価と同じ）
+     材料原価     … カルテで選んだ材料 ＋ 🏠店内で使ったぶん（＝消耗品へ繰入）
+     スタッフ購入 … 在庫カードの「スタッフ」欄。**カルテとも売上とも無関係**。
+                   支払明細にも入らない（原価として把握するだけ） */
+function acctCostHtml(m){
+  const c=closing(m);
+  const v={goods:c.cGoods+c.cGift+c.cCamp, mat:c.cMat, staff:staffYen(m)};
+  const sub={goods:`売れたぶん ${yen(c.cGoods)}／🎁 ${yen(c.cGift)}／🎉 ${yen(c.cCamp)}`,
+             mat:`カルテ ${yen(c.matYen)}／🏠店内 ${yen(c.useYen)}`,
+             staff:"在庫カードの「スタッフ」欄"};
+  const tile=k=>`<div class="sum-b${acctCostOpen===k?" on":""}" data-cost="${k}"
+      style="cursor:pointer;background:var(--card);border:1px solid ${
+        acctCostOpen===k?"var(--accent)":"var(--line)"};border-radius:10px;padding:11px 14px">
+      <span style="display:block;font-size:11px;letter-spacing:.08em;color:var(--ink3);margin-bottom:3px">
+        ${ACBRK[k]} ▼</span>
+      <b style="font-family:var(--mono);font-size:18px;font-weight:500">${yen(v[k])}</b>
+      <span style="display:block;font-size:11px;color:var(--ink3);margin-top:3px">${sub[k]}</span>
+    </div>`;
+  let brk="";
+  if(acctCostOpen){
+    const rows=acctBreak(m,acctCostOpen);
+    brk=rows.length
+      ? `<div class="bd" style="margin-top:10px"><div class="bdhead">
+          <b>${ACBRK[acctCostOpen]}の内訳　${m.replace("-","年")}月</b>
+          <span class="sp"></span>
+          <button class="nav" type="button" data-cost="${acctCostOpen}">閉じる</button></div>
+        <div style="overflow-x:auto"><table class="chk an"><thead><tr>
+          <th style="text-align:left">品名</th><th>個数</th><th>単価</th><th>原価</th></tr></thead><tbody>
+        ${rows.map(x=>`<tr><th>${x.tag?`<span class="stamp" title="${x.tag}">${ACSTAMP[x.tag]||x.tag}</span>`:""}${esc(x.n)}</th>
+          <td class="hi">${x.qty}</td><td>${yen(x.cost)}</td><td>${yen(x.yen)}</td></tr>`).join("")}
+        <tr class="bdtot"><th>合計　${rows.length}品目</th><td>${rows.reduce((a,x)=>a+x.qty,0)}</td>
+          <td></td><td>${yen(rows.reduce((a,x)=>a+x.yen,0))}</td></tr>
+        </tbody></table></div></div>`
+      : `<div class="bd" style="margin-top:10px"><p class="note" style="margin:0">
+          ${ACBRK[acctCostOpen]}はこの月にありません。
+          <button class="nav" type="button" data-cost="${acctCostOpen}">閉じる</button></p></div>`;
+  }
+  return `<p class="note" style="margin:18px 0 8px"><b>この月の原価</b>　
+      数量は Square と在庫の入力から、金額は商品の仕入単価から出しています。
+      <b>押すと内訳（何がいくつ・単価・原価）が出ます。</b></p>
+    <div class="sum" style="grid-template-columns:repeat(auto-fit,minmax(170px,1fr))">
+      ${tile("goods")}${tile("mat")}${tile("staff")}</div>
+    ${brk}`;
+}
+
 function acctYearHtml(){
   const y=+stMonth.slice(0,4), v=acctYearRows(y), yr=acctYears();
   const g=n=>n?yen(n):"—";
@@ -9090,6 +9309,8 @@ function acctMenuHtml(){
       <b>「← 会計にもどる」</b>が出ます。月の締めは「分析」タブにもあります。</p>
 
     ${payReadyHtml(m)}
+
+    ${acctCostHtml(m)}
 
     ${acctYearHtml()}`;
 }
@@ -9310,6 +9531,12 @@ function renderAcct(){
     // 年間一覧の前年・翌年。月ではなく**年をまたぐ**ので12か月ずらす（見ている月の位置はそのまま）
     document.getElementById("ac-py").onclick=()=>{stMonth=shiftMonth(stMonth,-12);renderAcct()};
     document.getElementById("ac-ny").onclick=()=>{stMonth=shiftMonth(stMonth,12);renderAcct()};
+    // v196：この月の原価タイル。押すとその内訳が開く（もう一度押すと閉じる）
+    el.querySelectorAll("[data-cost]").forEach(b=>b.onclick=e=>{
+      e.stopPropagation();
+      acctCostOpen = acctCostOpen===b.dataset.cost ? "" : b.dataset.cost;
+      renderAcct();
+    });
     el.querySelectorAll(".acrow").forEach(r=>r.onclick=()=>{ stMonth=r.dataset.am; renderAcct(); });
     // 原価の欄だけは「内訳を開く」。行の月移動には広げない（v178→v180で3列に）
     el.querySelectorAll("[data-ac]").forEach(td=>td.onclick=e=>{
