@@ -1,0 +1,512 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Salon de KOU</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Zen+Kaku+Gothic+New:wght@400;500;700&family=Cormorant+Garamond:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet">
+<script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js"></script>
+<style>
+/* ───────────────────────────────────────────────
+   お客様が見る画面（第2版）。
+   カルテッツのページに寄せて、ベージュ〜生成りの落ち着いた色にした。
+   スタッフ用アプリとは別物なので、あちらの CSS は持ち込んでいない。
+
+   ★ iPhone の LINE の中（幅375px）で開かれるのが前提。
+     まず375pxで整えてから、広い画面で伸ばしている。
+   ★ 片手で読めることを最優先。文字は最小 13px、押すところは 44px 以上。
+   ─────────────────────────────────────────────── */
+:root{
+  --bg:#F2EDE4; --card:#FBF8F3; --ink:#3D352B; --ink2:#6B5D4D; --ink3:#A2957F;
+  --line:#E4DBCB; --accent:#8C7A61; --accent-soft:#EFE8DB; --alert:#9C4A3C;
+  --ok:#6C7F63;
+  --mi:"Cormorant Garamond",serif;
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{
+  background:
+    radial-gradient(120% 60% at 10% 0%, #F7F2E9 0%, rgba(247,242,233,0) 62%),
+    radial-gradient(90% 50% at 96% 6%, #EDE5D6 0%, rgba(237,229,214,0) 55%),
+    var(--bg);
+  color:var(--ink); font-family:"Zen Kaku Gothic New",system-ui,sans-serif;
+  font-size:14px; line-height:1.75; -webkit-text-size-adjust:100%;
+  padding:0 0 calc(30px + env(safe-area-inset-bottom));
+}
+.wrap{max-width:600px;margin:0 auto;padding:0 14px}
+
+/* 見出し */
+.head{padding:22px 0 14px;text-align:center}
+.head .en{font-family:var(--mi);font-size:27px;letter-spacing:.10em;color:var(--accent)}
+.head .ja{font-size:11px;color:var(--ink3);letter-spacing:.22em;margin-top:2px}
+.head .rule{width:44px;height:1px;background:var(--line);margin:11px auto 0}
+
+/* タブ帯。リッチメニューと同じ3列×2段（5つめは店舗情報＝別ページへのリンク） */
+.tabs{display:grid;grid-template-columns:repeat(3,1fr);gap:7px;margin:0 0 16px}
+.tab{
+  border:1px solid var(--line);background:var(--card);color:var(--ink2);
+  border-radius:12px;padding:9px 3px;min-height:52px;cursor:pointer;
+  font-family:inherit;font-size:10.5px;line-height:1.35;text-decoration:none;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;
+}
+.tab .en{font-family:var(--mi);font-size:14px;letter-spacing:.05em}
+.tab[aria-selected="true"]{
+  background:var(--accent-soft);border-color:var(--accent);color:var(--accent);font-weight:500;
+}
+
+/* カード */
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;
+  padding:15px 15px;margin:0 0 11px}
+.card h2{margin:0 0 9px;font-size:11px;letter-spacing:.18em;color:var(--ink3);font-weight:500}
+.big{font-size:21px;font-weight:700;letter-spacing:.02em;line-height:1.5}
+.rows{display:grid;grid-template-columns:auto 1fr;gap:5px 13px;font-size:14px}
+.rows dt{color:var(--ink3);font-size:11.5px;white-space:nowrap;padding-top:3px}
+.rows dd{margin:0}
+
+/* 施術の記録 */
+.rec{border-top:1px solid var(--line);padding:13px 0 12px}
+.rec:first-of-type{border-top:none;padding-top:2px}
+.rec .d{font-family:var(--mi);font-size:17px;color:var(--accent);letter-spacing:.04em}
+.rec .m{font-size:15px;margin-top:1px}
+.rec .s{font-size:12px;color:var(--ink3);margin-top:3px}
+.rec .n{font-size:13px;color:var(--ink2);margin-top:6px;padding:7px 10px;
+  background:var(--accent-soft);border-radius:8px}
+
+/* 会員証 */
+.cardface{
+  background:linear-gradient(150deg,#FFFDF9 0%,#F6F0E5 55%,#EBE2D2 100%);
+  border:1px solid var(--line);border-radius:18px;padding:22px 18px;text-align:center;
+  box-shadow:0 2px 14px rgba(140,122,97,.12)}
+.cardface .shop{font-family:var(--mi);font-size:22px;color:var(--accent);letter-spacing:.10em}
+.cardface .nm{font-size:19px;font-weight:700;margin-top:14px}
+.cardface .kn{font-size:11px;color:var(--ink3);letter-spacing:.12em}
+.cardface .no{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;
+  font-size:13px;color:var(--ink2);margin-top:12px;letter-spacing:.06em}
+.qr{display:inline-block;background:#fff;padding:9px;border-radius:10px;
+  border:1px solid var(--line);margin-top:14px}
+.qr svg{display:block;width:150px;height:150px}
+
+/* クーポン */
+.cp{border:1px solid var(--line);border-radius:12px;padding:13px 13px;margin:0 0 9px;
+  background:linear-gradient(150deg,#FFFDF9 0%,#F4EEE2 100%)}
+.cp .t{font-size:15px;font-weight:700;line-height:1.5}
+.cp .v{font-family:var(--mi);font-size:20px;color:var(--accent);margin-top:2px;letter-spacing:.03em}
+.cp .x{font-size:11.5px;color:var(--ink3);margin-top:5px}
+.cp .b{font-size:12.5px;color:var(--ink2);margin-top:6px}
+.cp.used{opacity:.5}
+
+/* 入力フォーム */
+.fld{margin:0 0 11px}
+.fld label{display:block;font-size:11.5px;letter-spacing:.1em;color:var(--ink3);margin:0 0 4px}
+.fld input,.fld select{
+  width:100%;min-height:44px;border:1px solid var(--line);border-radius:10px;
+  background:#fff;color:var(--ink);font-family:inherit;font-size:16px; /* iOSで拡大されない大きさ */
+  padding:9px 11px;-webkit-appearance:none;appearance:none}
+.fld input:focus,.fld select:focus{outline:none;border-color:var(--accent);
+  box-shadow:0 0 0 3px rgba(140,122,97,.12)}
+.fld select{background-image:linear-gradient(45deg,transparent 50%,var(--ink3) 50%),
+  linear-gradient(135deg,var(--ink3) 50%,transparent 50%);
+  background-position:calc(100% - 18px) 20px,calc(100% - 13px) 20px;
+  background-size:5px 5px,5px 5px;background-repeat:no-repeat}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:9px}
+.btn{
+  width:100%;min-height:50px;border:none;border-radius:12px;cursor:pointer;
+  background:var(--accent);color:#fff;font-family:inherit;font-size:15px;letter-spacing:.08em;
+  margin-top:4px}
+.btn[disabled]{opacity:.55;cursor:default}
+.msg{margin-top:10px;font-size:13px;line-height:1.7;border-radius:10px;padding:10px 12px}
+.msg.ok{background:#EEF2EA;border:1px solid #D3DECB;color:var(--ok)}
+.msg.ng{background:#FBEFEC;border:1px solid #EBD2CA;color:var(--alert)}
+
+.note{font-size:11.5px;color:var(--ink3);line-height:1.75;margin:10px 2px 0}
+.center{text-align:center}
+.load{padding:64px 0;text-align:center;color:var(--ink3);font-size:13px}
+.err{background:#FBEFEC;border:1px solid #EBD2CA;color:var(--alert);
+  border-radius:12px;padding:16px;font-size:14px;line-height:1.8}
+.empty{padding:32px 0;text-align:center;color:var(--ink3);font-size:14px}
+.hide{display:none!important}
+@media (min-width:420px){
+  body{font-size:15px}
+  .tab{font-size:11.5px;min-height:56px}
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="head">
+    <div class="en">Salon de KOU</div>
+    <div class="ja">SINCE 2024</div>
+    <div class="rule"></div>
+  </div>
+  <div class="tabs" id="tabs" role="tablist">
+    <button class="tab" role="tab" data-p="my" aria-selected="false">
+      <span class="en">My page</span>マイページ</button>
+    <button class="tab" role="tab" data-p="record" aria-selected="false">
+      <span class="en">Record</span>施術の記録</button>
+    <button class="tab" role="tab" data-p="coupon" aria-selected="false">
+      <span class="en">Coupon</span>クーポン</button>
+    <button class="tab" role="tab" data-p="card" aria-selected="false">
+      <span class="en">Member</span>会員証</button>
+    <a class="tab" id="salonlink" href="#" role="tab" aria-selected="false">
+      <span class="en">Salon</span>店舗情報</a>
+  </div>
+  <div id="main"><div class="load">読み込んでいます…</div></div>
+</div>
+
+<script>
+/* ═══════════════════════════════════════════════════════════
+   Salon de KOU：お客様が見るページ（第2版・4タブ）
+
+   LINEのリッチメニュー →（LIFF）→ このページ、という順で開かれる。
+
+   ★ 見ている人が誰かは、**画面では決めない。**
+     LINEが発行した証（IDトークン）を中継役へ送り、
+     中継役がLINEに問い合わせて本物か確かめてから、その人ぶんだけを返す。
+     ここで利用者番号を画面から送って信用する作りにすると、
+     他人のカルテが読めるようになる。絶対にしないこと。
+     （読むとき＝action=me も、書くとき＝action=meput も、送るのはIDトークンだけ）
+
+   ★ このファイルには、お客様の情報を1件も焼き込まない。
+     中身は毎回、中継役から取ってくる。
+
+   ★ 施術の記録に出すのは、中継役が返してくる**お見せしてよい欄だけ**。
+     お店の中だけで使うスタッフの覚え書きは、中継役がそもそも返さないし、
+     このページにも一切書き出さない。
+   ═══════════════════════════════════════════════════════════ */
+
+/* ▼▼▼ 差し替えるのはここだけ ▼▼▼
+   サブの公式アカウントで試すときと、本番で使うときで、この3つを入れ替える。
+   （ここ以外に、LIFF ID・中継役のURLを書かないこと） */
+const LIFF_ID   = "";                 // 例 "2001234567-abcdefgh"（LINE Developers の LIFF ID）
+const RELAY_URL = "";                 // 例 "https://script.google.com/macros/s/AKfy…/exec"
+const SALON_URL = "kou-salon.html";        // 店舗情報のページ（kou-salon.html の置き場所。別の担当が作る）
+/* ▲▲▲ 上の2つを入れないと動きません ▲▲▲ */
+
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) =>
+  ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const yen = (n) => "¥" + Number(n || 0).toLocaleString("ja-JP");
+const jp = (d) => (d || "").replace(/^(\d{4})-(\d{2})-(\d{2})$/,
+  (_, y, m, dd) => `${y}年${+m}月${+dd}日`);
+const md = (d) => (d || "").replace(/^\d{4}-(\d{2})-(\d{2})$/, (_, m, dd) => `${+m}/${+dd}`);
+
+/* 中継役の宛先。?action=… を足すだけ。ヘッダーは付けない（下の送信のところに理由あり） */
+const relayUrl = (action) =>
+  RELAY_URL + (RELAY_URL.includes("?") ? "&" : "?") + "action=" + action;
+
+let data = null;
+let sending = false;                 /* ★ 二重送信よけ。送っている間は true */
+let page = (new URLSearchParams(location.search).get("p") || "my");
+if (!["record", "my", "card", "coupon"].includes(page)) page = "my";
+
+/* ---- 表示 ---- */
+function paintTabs() {
+  document.querySelectorAll(".tab").forEach((b) => {
+    if (!b.dataset.p) return;                       // 店舗情報はリンクなので飛ばす
+    b.setAttribute("aria-selected", b.dataset.p === page);
+    b.onclick = () => { page = b.dataset.p; paint(); window.scrollTo(0, 0); };
+  });
+  const s = $("salonlink"); if (s) s.href = SALON_URL;
+}
+function shell(html) { $("main").innerHTML = html; }
+
+function paint() {
+  paintTabs();
+  if (!data) return;
+  if (!data.linked) return shell(notLinked());
+  if (page === "record") return shell(viewRecord());
+  if (page === "coupon") return shell(viewCoupon());
+  if (page === "my") { shell(viewMy()); return bindForm(); }
+  shell(viewCard());
+  drawQr();
+}
+
+function notLinked() {
+  return `<div class="card">
+    <h2>はじめに</h2>
+    <p style="margin:0 0 10px">このLINEは、まだお客様の情報と結びついていません。</p>
+    <p class="note" style="margin:0">
+      次回ご来店の際に、スタッフが<b>6桁の登録コード</b>をお渡しします。
+      このトークにそのまま送っていただくと、マイページ・施術の記録・クーポン・会員証が
+      ご覧いただけます。<br><br>
+      お急ぎの場合は、このトークからお気軽にお声がけください。</p>
+  </div>`;
+}
+
+/* ───── ① マイページ（既定） ───── */
+function viewMy() {
+  const m = data.me || {}, n = data.next;
+  return `<div class="card">
+    <h2>NEXT RESERVATION　次回のご予約</h2>
+    ${n ? `<div class="big">${esc(jp(n.date))}　${esc(n.start || "")}</div>
+      <dl class="rows" style="margin-top:10px">
+        ${n.menu ? `<dt>メニュー</dt><dd>${esc(n.menu)}</dd>` : ""}
+        ${n.staff ? `<dt>担当</dt><dd>${esc(n.staff)}</dd>` : ""}
+      </dl>
+      <p class="note">ご変更・キャンセルは、このトークからご連絡ください。</p>`
+    : `<div class="empty" style="padding:18px 0">
+        ご予約はまだ入っていません。<br>
+        <span style="font-size:12px">メニューの「次回予約」からお取りいただけます。</span></div>`}
+  </div>
+  <div class="card">
+    <h2>MEMBER　お客様情報</h2>
+    <div class="big">${esc(m.name || "")}<span style="font-size:14px;font-weight:400"> 様</span></div>
+    ${m.kana ? `<div style="font-size:11px;color:var(--ink3);letter-spacing:.12em">${esc(m.kana)}</div>` : ""}
+    <dl class="rows" style="margin-top:12px">
+      <dt>会員番号</dt><dd style="font-family:ui-monospace,monospace">${esc(m.no || "")}</dd>
+      <dt>ご来店</dt><dd>${m.visits || 0}回目</dd>
+      ${m.first ? `<dt>初回</dt><dd>${esc(jp(m.first))}</dd>` : ""}
+      ${m.last ? `<dt>前回</dt><dd>${esc(jp(m.last))}</dd>` : ""}
+    </dl>
+  </div>
+  ${formMy()}`;
+}
+
+/* ───── お客様情報の入力（川口さんのご要望） ─────
+   お客様ご自身に入れていただき、そのままアプリの名簿に入る。
+   ★ 送り先は中継役の action=meput。IDトークンを必ず一緒に送る。
+   ★ すでに入っている分は初期値として出す（中継役が返してこない欄は空のまま）。 */
+function formMy() {
+  const m = data.me || {};
+  const v = (x) => esc(x || "");
+  const sexes = ["", "女性", "男性", "その他", "お答えしない"];
+  return `<div class="card">
+    <h2>YOUR DETAILS　ご登録内容の入力</h2>
+    <p class="note" style="margin:0 0 12px">
+      ご連絡やご案内に使わせていただきます。空欄のままでも送信できます。</p>
+    <form id="meform" autocomplete="on" novalidate>
+      <div class="fld">
+        <label for="f_kana">ふりがな</label>
+        <input id="f_kana" name="kana" type="text" inputmode="kana"
+               placeholder="やまだ はなこ" value="${v(m.kana)}">
+      </div>
+      <div class="fld">
+        <label for="f_tel">電話番号</label>
+        <input id="f_tel" name="tel" type="tel" inputmode="tel" autocomplete="tel"
+               placeholder="09012345678" value="${v(m.tel)}">
+      </div>
+      <div class="fld">
+        <label for="f_email">メールアドレス</label>
+        <input id="f_email" name="email" type="email" inputmode="email" autocomplete="email"
+               placeholder="example@example.com" value="${v(m.email || m.mail)}">
+      </div>
+      <div class="fld">
+        <label for="f_zip">郵便番号</label>
+        <input id="f_zip" name="zip" type="text" inputmode="numeric" autocomplete="postal-code"
+               placeholder="1234567" value="${v(m.zip)}">
+      </div>
+      <div class="fld">
+        <label for="f_addr">ご住所</label>
+        <input id="f_addr" name="addr" type="text" autocomplete="street-address"
+               placeholder="○○県○○市○○町1-2-3" value="${v(m.addr)}">
+      </div>
+      <div class="two">
+        <div class="fld">
+          <label for="f_birth">生年月日</label>
+          <input id="f_birth" name="birth" type="date" value="${v(m.birth)}">
+        </div>
+        <div class="fld">
+          <label for="f_sex">性別</label>
+          <select id="f_sex" name="sex">
+            ${sexes.map((s) => `<option value="${esc(s)}"${(m.sex || "") === s ? " selected" : ""}>${
+              s ? esc(s) : "選択しない"}</option>`).join("")}
+          </select>
+        </div>
+      </div>
+      <button class="btn" id="mesave" type="submit">この内容で登録する</button>
+      <div id="memsg" class="msg hide"></div>
+    </form>
+    <p class="note">いただいた内容は当店のご予約・ご案内にのみ使います。</p>
+  </div>`;
+}
+
+/* フォームの動き。paint() で描き直すたびに付け直す */
+function bindForm() {
+  const f = $("meform"); if (!f) return;
+  f.addEventListener("submit", (ev) => { ev.preventDefault(); saveMe(); });
+}
+
+function meMsg(text, ok) {
+  const box = $("memsg"); if (!box) return;
+  box.className = "msg " + (ok ? "ok" : "ng");
+  box.textContent = text;
+}
+
+async function saveMe() {
+  if (sending) return;                      /* ★ 二重送信よけ。連打しても1回だけ */
+  const btn = $("mesave"), f = $("meform");
+  if (!f) return;
+
+  const val = (id) => String(($(id) && $(id).value) || "").trim();
+  const body = {
+    kana:  val("f_kana"),
+    tel:   val("f_tel").replace(/[^0-9]/g, ""),
+    email: val("f_email"),
+    zip:   val("f_zip").replace(/[^0-9]/g, ""),
+    addr:  val("f_addr"),
+    birth: val("f_birth"),
+    sex:   val("f_sex")
+  };
+
+  /* かんたんな確かめ。うるさくしない（空欄のままでも送れる） */
+  if (body.tel && (body.tel.length < 10 || body.tel.length > 11))
+    return meMsg("電話番号の桁数をご確認ください。", false);
+  if (body.email && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(body.email))
+    return meMsg("メールアドレスの形をご確認ください。", false);
+  if (body.zip && body.zip.length !== 7)
+    return meMsg("郵便番号は7桁でご入力ください。", false);
+
+  sending = true;
+  if (btn) { btn.disabled = true; btn.textContent = "送信しています…"; }
+  meMsg("送信しています…", true);
+
+  try {
+    /* ★ 送るのは毎回その場でもらい直した証。画面が持っている番号は送らない */
+    const token = (typeof liff !== "undefined" && liff.getIDToken) ? liff.getIDToken() : "";
+    if (!token) throw new Error("ご本人の確認ができませんでした。LINEのメニューから開き直してください。");
+
+    /* ★ ヘッダーは付けない。付けるとブラウザが先に OPTIONS を聞きに行き、
+         Apps Script はそれに答えられないので通らなくなる（読み込みと同じ作法） */
+    const res = await fetch(relayUrl("meput"), {
+      method: "POST",
+      body: JSON.stringify({ idToken: token, me: body })
+    });
+    const j = await res.json();
+    if (j && j.error) { meMsg(String(j.error), false); }
+    else if (j && j.ok) {
+      data.me = Object.assign({}, data.me || {}, body);   /* 画面の控えも合わせておく */
+      meMsg("保存しました。ありがとうございます。", true);
+    } else {
+      meMsg("保存できたか分かりませんでした。少し時間をおいて、もう一度お試しください。", false);
+    }
+  } catch (e) {
+    meMsg(String((e && e.message) || e || "通信できませんでした。"), false);
+  } finally {
+    sending = false;
+    if (btn) { btn.disabled = false; btn.textContent = "この内容で登録する"; }
+  }
+}
+
+/* ───── ② 施術の記録 ─────
+   出すのは、中継役が返してくる欄だけ（日付・メニュー・部位・担当・金額・次回のご提案）。 */
+function viewRecord() {
+  const r = data.records || [];
+  if (!r.length) return `<div class="card"><div class="empty">
+    施術の記録はまだありません。<br>ご来店をお待ちしております。</div></div>`;
+  return `<div class="card">
+    <h2>RECORD　施術の記録　${r.length}件</h2>
+    ${r.map((k) => `<div class="rec">
+      <div class="d">${esc(jp(k.date))}</div>
+      <div class="m">${esc(k.menu || k.goods || "ご来店")}</div>
+      ${k.parts ? `<div class="s">${esc(k.parts)}</div>` : ""}
+      <div class="s">${k.staff ? esc(k.staff) + "　" : ""}${k.price ? yen(k.price) : ""}</div>
+      ${k.next ? `<div class="n">次回のご提案：${esc(k.next)}</div>` : ""}
+    </div>`).join("")}
+  </div>
+  <p class="note center">記録は当店で入力したものです。<br>
+    お気づきの点があれば、トークからお知らせください。</p>`;
+}
+
+/* ───── ③ クーポン ─────
+   中継役の戻りに coupons が無くても落ちないこと。
+   （中継役側は別の担当が足すので、無い間は「ありません」と出るだけにする） */
+function viewCoupon() {
+  const list = Array.isArray(data.coupons) ? data.coupons : [];
+  const live = list.filter((cp) => cp && !cp.used);
+  if (!live.length) return `<div class="card"><div class="empty">
+    いまお使いいただけるクーポンはありません。<br>
+    <span style="font-size:12px">新しいご案内は、このトークでお知らせします。</span></div></div>`;
+  return `<div class="card">
+    <h2>COUPON　クーポン　${live.length}枚</h2>
+    ${live.map((cp) => {
+      const name  = cp.name || cp.title || "クーポン";
+      const value = cp.value || (cp.off ? cp.off + "％OFF" : "") || (cp.yen ? yen(cp.yen) + " OFF" : "");
+      const until = cp.until || cp.limit || cp.expire || "";
+      const body  = cp.text || cp.detail || cp.desc || "";
+      return `<div class="cp">
+        <div class="t">${esc(name)}</div>
+        ${value ? `<div class="v">${esc(value)}</div>` : ""}
+        ${body ? `<div class="b">${esc(body)}</div>` : ""}
+        ${until ? `<div class="x">${esc(jp(until) || until)} まで</div>` : ""}
+      </div>`;
+    }).join("")}
+  </div>
+  <p class="note center">ご会計のときに、この画面をスタッフにお見せください。<br>
+    他のご優待との併用はできない場合があります。</p>`;
+}
+
+/* ───── ④ 会員証 ───── */
+function viewCard() {
+  const m = data.me || {};
+  return `<div class="cardface">
+    <div class="shop">Salon de KOU</div>
+    <div class="nm">${esc(m.name || "")} 様</div>
+    ${m.kana ? `<div class="kn">${esc(m.kana)}</div>` : ""}
+    <div class="no">${esc(m.no || "")}</div>
+    <div id="qrbox"></div>
+    <div class="no" style="margin-top:10px;font-size:11px;color:var(--ink3)">
+      ご来店${m.visits || 0}回目</div>
+  </div>
+  <p class="note center">ご来店の際に、この画面をスタッフにお見せください。</p>`;
+}
+
+function drawQr() {
+  const box = $("qrbox"); if (!box || typeof qrcode !== "function") return;
+  try {
+    const q = qrcode(0, "M");
+    q.addData((data.me && data.me.no) || "");
+    q.make();
+    box.innerHTML = `<div class="qr">${q.createSvgTag(4, 0)}</div>`;
+  } catch (e) { /* QRが作れなくても会員証は出す */ }
+}
+
+function fail(msg, hint) {
+  shell(`<div class="err"><b>${esc(msg)}</b>${hint ? `<br><br>${esc(hint)}` : ""}</div>`);
+}
+
+/* ---- 起動 ---- */
+(async () => {
+  paintTabs();
+
+  if (!LIFF_ID || !RELAY_URL) {
+    return fail("設置がまだ終わっていません。",
+      "このページの LIFF_ID と RELAY_URL を入れてください（設置した方へのお知らせです）。");
+  }
+  /* パソコンのブラウザで直に開いたときなど、LINEの部品が読めていない場合 */
+  if (typeof liff === "undefined") {
+    return fail("このページは、LINEの中から開いてください。",
+      "LINEのトーク下のメニューから開くと、ご自分の情報が出ます。");
+  }
+  try {
+    await liff.init({ liffId: LIFF_ID });
+  } catch (e) {
+    return fail("LINEとつながりませんでした。", "LINEのメニューから開き直してください。");
+  }
+  if (!liff.isLoggedIn()) { liff.login(); return; }
+
+  const token = liff.getIDToken();
+  if (!token) {
+    return fail("ご本人の確認ができませんでした。",
+      "LINEのメニューから開き直してください。");
+  }
+
+  try {
+    /* ★ ヘッダーは付けない。付けるとブラウザが先に OPTIONS を聞きに行き、
+         Apps Script はそれに答えられないので通らなくなる */
+    const res = await fetch(relayUrl("me"), {
+      method: "POST", body: JSON.stringify({ idToken: token })
+    });
+    const j = await res.json();
+    if (j.error) return fail("うまく読み込めませんでした。", j.error);
+    data = j;
+    paint();
+  } catch (e) {
+    fail("通信できませんでした。", "電波の良いところで、もう一度お試しください。");
+  }
+})();
+</script>
+</body>
+</html>

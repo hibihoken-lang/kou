@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>店舗情報｜Salon de KOU</title>
+<style>
+/* ───────────────────────────────────────────────
+   LINEのリッチメニュー「店舗情報」から開くページ。
+   お客様が見る画面なので、片手で読めることを最優先。
+   文字は最小 12px、押すところは 44px 以上が要る。
+
+   ★ 外のファイルを1つも読まない（フォントも地図も読み込まない）。
+     LINEの中のブラウザは電波の悪いところで開かれる。
+     1枚で完結していれば、遅くても必ず出る。
+
+   ★ このページには、お客様の情報を1文字も焼き込まない。
+     公開の置き場所に載せるので、載せたら世界中から読める。
+   ─────────────────────────────────────────────── */
+:root{
+  --bg:#F7F4EE; --card:#FFFFFF; --ink:#4A4038; --ink2:#6B5D4D; --ink3:#9C8F7E;
+  --line:#E4DBCB; --accent:#8C7659; --accent-soft:#F2EDE4; --alert:#B4544B;
+  --mi:"Cormorant Garamond","Times New Roman",'Hiragino Mincho ProN',serif;
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{
+  background:
+    radial-gradient(120% 60% at 12% 0%, #F2EDE4 0%, rgba(242,237,228,0) 60%),
+    radial-gradient(90% 50% at 95% 8%, #EFE7D9 0%, rgba(239,231,217,0) 55%),
+    var(--bg);
+  color:var(--ink); font-family:"Hiragino Sans","Yu Gothic",system-ui,sans-serif;
+  font-size:15px; line-height:1.75; -webkit-text-size-adjust:100%;
+  padding:0 0 calc(28px + env(safe-area-inset-bottom));
+}
+.wrap{max-width:600px;margin:0 auto;padding:0 16px}
+
+/* 見出し */
+.head{padding:22px 0 14px;text-align:center}
+.head .en{font-family:var(--mi);font-size:26px;letter-spacing:.06em;color:var(--accent)}
+.head .ja{font-size:12px;color:var(--ink3);letter-spacing:.16em;margin-top:2px}
+
+/* カード */
+.card{background:var(--card);border:1px solid var(--line);border-radius:16px;
+  padding:16px 16px;margin:0 0 12px}
+.card h2{margin:0 0 10px;font-size:13px;letter-spacing:.08em;color:var(--ink3);font-weight:500}
+.big{font-size:22px;font-weight:700;letter-spacing:.02em}
+.big .en{font-family:var(--mi);font-size:24px;color:var(--accent);letter-spacing:.06em}
+.rows{display:grid;grid-template-columns:auto 1fr;gap:6px 14px;font-size:14px;margin:0}
+.rows dt{color:var(--ink3);font-size:12px;white-space:nowrap;padding-top:2px}
+.rows dd{margin:0}
+
+/* 営業時間の表。狭い画面でも2列で収まる幅にしてある */
+.hours{width:100%;border-collapse:collapse;font-size:14px}
+.hours th,.hours td{text-align:left;padding:8px 0;border-top:1px solid var(--line);vertical-align:top}
+.hours tr:first-child th,.hours tr:first-child td{border-top:none}
+.hours th{font-weight:400;color:var(--ink2);white-space:nowrap;padding-right:10px}
+.hours td{font-family:var(--mi);font-size:17px;letter-spacing:.03em;color:var(--ink)}
+.hours td .sub{font-family:inherit;font-size:12px;color:var(--ink3);letter-spacing:0}
+.rest{margin:10px 0 0;padding:8px 10px;background:var(--accent-soft);
+  border-radius:9px;font-size:13px;color:var(--ink2)}
+
+/* 押すところ。指で押すので 44px 以上 */
+.btn{display:flex;align-items:center;justify-content:center;gap:8px;
+  min-height:48px;margin:8px 0 0;padding:10px 14px;
+  border:1px solid var(--line);border-radius:14px;background:var(--card);
+  color:var(--accent);text-decoration:none;font-size:15px;letter-spacing:.02em}
+.btn.fill{background:var(--accent-soft);border-color:var(--accent)}
+.btn .en{font-family:var(--mi);font-size:16px;letter-spacing:.06em}
+.tel{font-family:var(--mi);font-size:23px;letter-spacing:.06em}
+
+.soon{padding:10px 12px;background:var(--accent-soft);border-radius:9px;
+  font-size:14px;color:var(--ink2)}
+.note{font-size:12px;color:var(--ink3);line-height:1.7;margin:10px 2px 0}
+.center{text-align:center}
+
+/* いちばん下の帯（ほかのページへ戻るところ） */
+.nav{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:18px 0 0}
+.nav a,.nav span{
+  border:1px solid var(--line);background:var(--card);color:var(--ink2);
+  border-radius:14px;padding:10px 4px;min-height:56px;text-decoration:none;
+  font-size:11px;line-height:1.35;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px}
+.nav .en{font-family:var(--mi);font-size:15px;letter-spacing:.04em}
+.nav .here{background:var(--accent-soft);border-color:var(--accent);color:var(--accent);font-weight:500}
+.nav .off{color:var(--ink3)}
+</style>
+</head>
+<body>
+
+<!-- ═══════════════════════════════════════════════════════════
+     ▼▼▼ 行き先（公開URLに合わせて差し替える）▼▼▼
+
+     いまは同じ場所に3枚を並べて置く前提で、相対パスで書いてある。
+     GitHub Pages などに置いたら、そのときの公開URLに合わせること。
+
+       マイページ　… kou-mypage_2.html        （施術記録・マイページ・会員証）
+       ご予約　　　… ★未確認（下を見ること）
+       このページ　… kou-salon.html           （いま開いている店舗情報）
+       ご利用案内　… kou-guide.html
+
+     ★未確認：ご予約の行き先。
+       リッチメニューの「ご予約」は、もともと外部（サロンボード／ホットペッパー）。
+       そのURLがどこにも控えられていないので、ここでは行き先を入れていない。
+       画面には「（準備中）」と出る。**川口さんに聞いて、下の帯に入れること。**
+     ▲▲▲ ここまで ▲▲▲
+     ═══════════════════════════════════════════════════════════ -->
+
+<div class="wrap">
+  <div class="head">
+    <div class="en">Salon de KOU</div>
+    <div class="ja">SALON INFORMATION</div>
+  </div>
+
+  <div class="card">
+    <h2>店舗</h2>
+    <div class="big"><span class="en">Salon de KOU</span></div>
+    <p style="margin:2px 0 12px;font-size:13px;color:var(--ink3)">サロンドコウ</p>
+    <dl class="rows">
+      <dt>住所</dt>
+      <dd>〒503-0983<br>岐阜県大垣市静里町1171-1<br>川瀬ビル1F</dd>
+    </dl>
+    <!-- 地図は iframe で埋め込まない。LINEの中のブラウザで重いのと、
+         鍵（APIキー）の話になるため。押したら地図アプリが開くだけにしてある -->
+    <a class="btn fill" href="https://www.google.com/maps/search/?api=1&amp;query=35.3532501,136.5938844"
+       target="_blank" rel="noopener">
+      <span class="en">Map</span>Googleマップで開く</a>
+  </div>
+
+  <div class="card">
+    <h2>お電話</h2>
+    <!-- 押したらそのままかけられるように tel: にしてある -->
+    <a class="btn fill" href="tel:09076116638">
+      <span class="tel">090-7611-6638</span></a>
+    <p class="note center">施術中はお電話に出られないことがございます。<br>
+      LINEのトークからもご連絡いただけます。</p>
+  </div>
+
+  <div class="card">
+    <h2>営業時間</h2>
+    <table class="hours">
+      <tr><th>平日</th><td>9:30〜16:00</td></tr>
+      <tr><th>火・木</th><td>18:30〜20:00<br><span class="sub">水野</span></td></tr>
+      <tr><th>土・日・祝</th><td>10:00〜21:00</td></tr>
+    </table>
+    <p class="rest">定休日　月曜日</p>
+    <p class="note">ご予約の状況により、最終の受付時間が変わることがございます。</p>
+  </div>
+
+  <div class="card">
+    <h2>アクセス</h2>
+    <!-- ★未確認：川口さんに聞いて埋める
+         カルテッツの「店舗情報」にも入っていなかった。
+         最寄り駅・バス停・道順は、こちらでは分からないので書かない。
+         （でっち上げた道順を載せると、お客様が迷う） -->
+    <p class="soon">（準備中）</p>
+    <p class="note">道順のご案内は、上の「Googleマップで開く」をお使いください。</p>
+  </div>
+
+  <div class="card">
+    <h2>駐車場</h2>
+    <!-- ★未確認：川口さんに聞いて埋める
+         台数・場所・ビルのどこに停めてよいかが、カルテッツに入っていなかった。
+         「◯台あります」と書いてしまうと、停められなかったときに困る -->
+    <p class="soon">（準備中）</p>
+  </div>
+
+  <div class="card">
+    <h2>Instagram</h2>
+    <a class="btn" href="https://www.instagram.com/salondekou2024/" target="_blank" rel="noopener">
+      <span class="en">Instagram</span>@salondekou2024</a>
+  </div>
+
+  <!-- いちばん下の帯。ここから他のページへ戻れる -->
+  <nav class="nav">
+    <a href="kou-mypage_2.html"><span class="en">My page</span>マイページ</a>
+    <!-- ★未確認：ご予約の行き先（外部の予約サイト）。分かったら href を入れて <a> に戻す -->
+    <span class="off"><span class="en">Reserve</span>ご予約（準備中）</span>
+    <span class="here"><span class="en">Salon</span>店舗情報</span>
+  </nav>
+  <p class="note center"><a href="kou-guide.html" style="color:var(--ink2)">ご利用案内はこちら</a></p>
+</div>
+
+</body>
+</html>
