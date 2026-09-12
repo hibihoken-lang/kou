@@ -277,12 +277,19 @@
   .ev .t{font-size:10px;opacity:.92;display:block}
   .ev .n{display:block;font-weight:500}
   .ev.cx{text-decoration:line-through;opacity:.8}
+  /* v226：今日メールから取り込んだ予約。**担当者の色は変えず、外に枠を足すだけ**
+     （色を変えると凡例の「誰の予約か」が読めなくなる）。当日を過ぎれば自然に消える。
+     ★★ 枠は**暖色**にすること。はじめ青緑（#0E7C9B）にしたら、
+       **水野さんの札（#2E6E8E／#5FA3C4）と同系で、札が少し太く見えるだけ**になった。
+     ★ 内側に白を1本はさむ。札の色が濃くても枠が浮く */
+  .ev.imp{box-shadow:0 0 0 1px #fff,0 0 0 3px #C8641E,0 0 0 1px rgba(255,255,255,.75) inset}
 
   .off{background:#F2A2C6;color:#54203D;border-radius:4px;padding:3px 7px;font-size:11px;
        margin:4px 3px;cursor:pointer;display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .legend{display:flex;gap:14px;flex-wrap:wrap;margin-top:10px;font-size:11px;color:var(--ink3)}
   .legend i{display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:3px;vertical-align:-1px}
   .legend i+i{margin-right:5px}
+  .legend i.ring{background:#fff;box-shadow:0 0 0 2px #C8641E}
 
   /* ---------- ★ v220：携帯のスケジュールを、カルテッツ並みの見やすさにする ----------
      利用者の指示：**「カルテッツとこのアプリの携帯で見たスケジュール、
@@ -822,6 +829,13 @@
   .kdet{border:1px solid var(--accent);background:#fff;color:var(--accent);border-radius:5px;
         padding:7px 15px;font-size:12px;cursor:pointer;flex:none}
   .kdet:hover{background:var(--accent);color:#fff}
+  /* v226：未確認のカルテに出す「済にする」。**押すまで色が付いたまま**なので残りが一目で分かる */
+  .kchk{border:1px solid #C8641E;background:#FFF3E6;color:#A8500F;border-radius:5px;
+        padding:7px 13px;font-size:12px;cursor:pointer;flex:none;font-weight:600}
+  .kchk:hover{background:#C8641E;color:#fff}
+  .kok{font-size:11px;color:#4C8B3F;border:1px solid #B9D8B2;background:#F1F8EF;
+       border-radius:4px;padding:4px 9px;flex:none;white-space:nowrap}
+  .krow.need{background:#FFFBF5}
   @media (max-width:900px){
     .krow{flex-wrap:wrap;gap:8px}
     .kcust{width:100%;order:9}
@@ -920,7 +934,7 @@
 /* このファイルの版。ファイル名の番号（salon-de-kou-karte_NN.html）と必ずそろえること。
    仕分け待ちの下書きを捨てるかどうかの判定（BUYVER）にも使うので、
    ここを上げ忘れると、古い読み取りで作られた下書きが生き残る（v87でやらかした） */
-const APPVER=222;
+const APPVER=226;
 const KEY="sdk:data";
 /* ★ v133：QC／SEED／PROD／MENU／QK／CHARTS0／STOCK0／ACTUAL／VISITS は
    **わざと空にしてあります。書き戻さないこと。**
@@ -2741,7 +2755,11 @@ function bindChartForm(c,k){
       skin:g("k-skin"), sales:sales,
       wish:g("k-wish"), next:g("k-next"), note:g("k-note"),
       mats:readMats(), gifts:readGifts(), camps:readCamps(),
-      photos:kPhotos.slice()
+      photos:kPhotos.slice(),
+      /* v226：**手で打ったカルテは、その場で確認ずみ。**
+         川口さんが自分の意思で入力したものなので、あとから「済」を押す必要はない。
+         Squareから自動でできたカルテを**書き足したとき**も、ここを通る＝確認ずみになる */
+      chk:1
     };
     if(k){
       // v152：今日の記録に**書き足す**。増やさない。
@@ -2867,10 +2885,17 @@ function lanes(list){
 }
 
 function legendHtml(hint){
+  /* v226：今日メールから取り込んだ予約の件数。
+     ★ **取消は枠が付かない**（`evHtml` の `fresh` が `!off` を見ている）ので数えない。
+     ★ 取り込むのは先の予約が多いので、**いま見ている週の外**のぶんも入る。
+       画面の枠の数と合わないことがあるため、そう書いてある */
+  const impN=(db.appts||[]).filter(a=>a.imp===today()&&a.status!=="cancel"&&!a.off).length;
   return `<div class="legend">${STAFF.map(s=>
     `<span><i style="background:${COL[s][0]}"></i><i style="background:${COL[s][1]}"></i>${esc(s)}</span>`).join("")}
     <span>薄いほうが新規</span>
     <span><i style="background:#F2A2C6"></i>終日（休暇など）</span>
+    <span><i class="ring"></i>${impN?`今日取り込んだ予約 ${impN}件（先の週のぶんも含む）`:"今日取り込んだ予約"}</span>
+    <span>「済」＝カルテ確認ずみ</span>
     <span>${hint}</span></div>`;
 }
 
@@ -2891,9 +2916,16 @@ function evHtml(x){
      ★ ステータスは STAT の4つだけ。ここは文字を差し替えているだけで、
        欄も色も増やしていない */
   const st=statOf(a);
+  /* ★ v226：「済」は **カルテを確認したかどうか**（`apDone`）で出す。
+     v204〜v225 は `stat==="来店済み"` で出していたが、Squareの取り込みが
+     自動でそれを付けるので、**川口さんが何もしていない枠にも「済」が出ていた**。 */
   const mark=off?(st==="無断キャンセル"?"無断 ":"取消 ")
-            :(st==="来店済み"?"済 ":"");
-  return `<div class="ev${off?" cx":""}" data-id="${a.id}"
+            :(apDone(a)?"済 ":"");
+  /* ★ v226：**今日メールから取り込んだ予約に枠を付ける**（利用者の指示）。
+     「取り込みました」と出ても誰のことか分からず、メールを見に行くしかなかった。
+     `a.imp` は取り込んだ日。**当日しか光らない**ので、消す手入れは要らない */
+  const fresh=!off&&a.imp===today();
+  return `<div class="ev${off?" cx":""}${fresh?" imp":""}" data-id="${a.id}"
     style="top:${top}px;height:${h}px;left:${L}%;width:calc(${w}% - 3px);background:${off?"#B9BDB6":colOf(a)}">
     <span class="t">${tm}</span>
     <span class="n">${mark}${isNew(a)&&!off?"新":""}${esc(a.name)}${who}</span></div>`;
@@ -3609,6 +3641,7 @@ function importQuartets(){
 
 /* ---------- カルテ管理（一覧・ページング・詳細） ---------- */
 let kQ="", kSort="new", kPer=25, kPage=1;
+let kOnlyNew=false;        /* v226：未確認（Squareから勝手にできたぶん）だけに絞る */
 const spentOf=cid=>chartsOf(cid).reduce((a,k)=>a+(k.price||0),0);
 function karteNo(k){
   if(!k.no){
@@ -3625,10 +3658,12 @@ function allCharts(){
        打っていないことばに当たってしまう */
   const q=KNORM(kQ);
   const qn=q.replace(/[^0-9]/g,"");
-  const f=q?list.filter(x=>
+  const f0=q?list.filter(x=>
       [x.c.name,x.c.kana,x.k.menu,x.k.date,x.k.staff].some(v=>KNORM(v||"").includes(q))
       ||(qn.length>=3&&String(x.c.tel||"").replace(/[^0-9]/g,"").includes(qn))
     ):list;
+  /* v226：未確認だけに絞る（Squareから自動でできて、まだ「済」を押していないカルテ） */
+  const f=kOnlyNew?f0.filter(x=>kNeedChk(x.k)):f0;
   const s={new:(a,b)=>b.k.date.localeCompare(a.k.date)||(b.k.no||0)-(a.k.no||0),
            old:(a,b)=>a.k.date.localeCompare(b.k.date)||(a.k.no||0)-(b.k.no||0),
            high:(a,b)=>(b.k.price||0)-(a.k.price||0),
@@ -3656,10 +3691,15 @@ function renderKarte(){
     return out.join("");
   };
 
+  /* v226：未確認（Squareから自動でできて、まだ「済」を押していない）の件数。
+     ★ 絞り込みや検索に関係なく、**ぜんぶの中の残り**を数える */
+  const needN=(db.charts||[]).filter(kNeedChk).length;
   el.innerHTML=`
     <div class="khead">
       <h2>カルテ一覧</h2>
       ${sqBtnHtml("k-sq2")}
+      <button class="btn${kOnlyNew?"":" ghost"}" id="k-only"
+        >${kOnlyNew?"未確認だけ表示中（解除）":`未確認だけ見る${needN?`（${needN}件）`:""}`}</button>
       <select class="f-in" id="k-per" style="width:auto">
         ${[25,50,100].map(n=>`<option value="${n}"${n===kPer?" selected":""}>1ページ ${n}件</option>`).join("")}
       </select>
@@ -3671,10 +3711,18 @@ function renderKarte(){
     </div>
     <div class="kpager">${pager()}</div>
     <div class="kbar"><b>カルテ</b>
-      <span>${list.length?`${from+1}〜${Math.min(from+kPer,list.length)}件目を表示`:"該当なし"}　合計${list.length}件</span></div>
+      <span>${list.length?`${from+1}〜${Math.min(from+kPer,list.length)}件目を表示`:"該当なし"}　合計${list.length}件</span>
+      ${needN?`<span style="color:#A8500F">未確認 ${needN}件</span>`:`<span style="color:#4C8B3F">未確認はありません</span>`}
+      ${kOnlyNew&&list.length?`<button class="btn ghost" id="k-allok"
+        >この${list.length}件をまとめて済にする</button>`:""}</div>
+    ${kOnlyNew?`<p class="note" style="margin:8px 2px">
+      <b>Squareのお会計から自動でできたカルテのうち、まだ「済」を押していないぶんです。</b>
+      中身を見て、これでよければ「済にする」を押してください。スケジュールの札に「済」と出ます。
+      手で打ったカルテは、打った時点で済になっています（ここには出ません）。</p>`:""}
     <div class="klist">${page.map(({k,c})=>{
       const line=c.lineId?(c.lineBlocked?["被ブロック","blk"]:["LINE送信OK","ok"]):["LINE未連携","no"];
-      return `<div class="krow" data-k="${k.id}">
+      const need=kNeedChk(k);
+      return `<div class="krow${need?" need":""}" data-k="${k.id}">
         <span class="kno">${karteNo(k)}</span>
         <span class="kdate">${k.date.replace(/-/g,"/")}</span>
         <span class="kstaff">${esc(k.staff||"")}</span>
@@ -3686,6 +3734,9 @@ function renderKarte(){
           ${c.tel?`<em>${telFmt(c.tel)}</em>`:""}
           <small>${karteIsGoodsOnly(k)?"【物販】":""}${esc(karteTitle(k).slice(0,44))}</small>
         </span>
+        ${need?`<button class="kchk" data-kok="${k.id}"
+            title="中身を見て、これでよければ押してください。スケジュールに「済」と出ます">済にする</button>`
+          :`<span class="kok">済</span>`}
         <button class="kdet" data-kc="${c.id}">この方の一覧</button>
         <button class="kdet" data-k="${k.id}">詳細</button>
       </div>`;}).join("")||'<div class="empty" style="padding:40px"><b>カルテがありません</b></div>'}
@@ -3696,6 +3747,34 @@ function renderKarte(){
   const q=document.getElementById("k-q");
   q.oninput=()=>{kQ=q.value; kPage=1; renderKarte();
     const n=document.getElementById("k-q"); n.focus(); n.setSelectionRange(n.value.length,n.value.length);};
+  /* v226：未確認だけに絞る／解除 */
+  document.getElementById("k-only").onclick=()=>{kOnlyNew=!kOnlyNew;kPage=1;renderKarte()};
+  /* v226：1件ずつ「済にする」。★ 行そのものにも onclick（詳細を開く）が付いているので、
+     stopPropagation を忘れるとモーダルが開いてしまう */
+  el.querySelectorAll("[data-kok]").forEach(b=>b.onclick=async e=>{
+    e.stopPropagation();
+    await markKarteChecked(b.dataset.kok);
+  });
+  /* v226：絞り込んだぶんをまとめて済にする。**戻せないので必ず件数を見せて確認する** */
+  const allok=document.getElementById("k-allok");
+  if(allok) allok.onclick=async()=>{
+    const ids=list.filter(x=>kNeedChk(x.k)).map(x=>x.k.id);
+    if(!ids.length) return;
+    if(!confirm(`いま出ている ${ids.length}件を、まとめて「済」にします。
+
+カルテの中身は1文字も変わりません。「見ました」という印が付くだけです。
+★ 過去のぶんもすべて含みます（Squareのぶんは使い始めた月までさかのぼって並びます）。
+　最近のぶんだけ片づけたいときは、いったん閉じて、上の検索に年月（例：2026-09）を
+　入れてから押してください。
+スケジュールの札に「済」と出るようになります。
+
+★ 元に戻すには、1件ずつカルテを開いて「未確認にもどす」を押すことになります。
+
+よろしいですか？`)) return;
+    ids.forEach(id=>{const k=db.charts.find(x=>x.id===id); if(k) k.chk=1;});   /* v226：印だけ */
+    await save(); renderKarte(); renderSched(); renderList();
+    toast(`${ids.length}件を「済」にしました`);
+  };
   document.getElementById("k-per").onchange=e=>{kPer=+e.target.value;kPage=1;renderKarte()};
   document.getElementById("k-sort").onchange=e=>{kSort=e.target.value;kPage=1;renderKarte()};
   /* v206：`scrollIntoView` はブラウザにしかない。**このアプリの決まりどおり**、
@@ -3824,6 +3903,10 @@ function mergeCharts(keepId,dropId){
      ★ **残すほう（a）が手で書いたカルテで、消すほう（b）がSquareのカルテ**という
        組み合わせもある（b の sqid を a が引き継ぐ）。そのときは
        **a のもとの金額**がひもづかないぶんなので、両方を見る */
+  /* ★ v226：まとめると `src` が "square" に変わることがある（下の行）。
+     まとめる前に確認ずみだったカルテが、まとめた瞬間に「未確認」へ化けないよう、
+     ここで見ておいて、あとで印を残す */
+  const aWasChecked=kChecked(a)||kChecked(b);
   const noSq=x=>!x.sqid&&!(x.sqids||[]).length;
   const aHand=noSq(a)?(+a.price||0):0;
   const bHand=noSq(b)?(+b.price||0):0;
@@ -3850,6 +3933,7 @@ function mergeCharts(keepId,dropId){
     a.photos=[...(a.photos||[]),...b.photos].slice(0,KPHOTO_MAX);
   if(!a.src&&b.src) a.src=b.src;
   if(b.src==="square") a.src="square";
+  if(aWasChecked) a.chk=1;                     /* v226：確認ずみは、まとめても確認ずみ */
   /* SquareのIDは両方持つ。捨てると次の取り込みでまた2件になる */
   const ids=new Set([...(a.sqids||[]),...(b.sqids||[]),b.sqid].filter(Boolean));
   if(!a.sqid&&b.sqid){ a.sqid=b.sqid; }
@@ -3885,6 +3969,18 @@ function openKarteModal(id){
         ${esc(c.name)}${c.kana?`（${esc(c.kana)}）`:""}${c.tel?`　${telFmt(c.tel)}`:""}
         <br><small style="color:var(--ink3)">累計 ${yen(spentOf(c.id))}／来店 ${chartsOf(c.id).length}回</small>
         ${c.caution?`<br><b style="color:var(--alert)">注意事項: ${esc(c.caution)}</b>`:""}</div></div>
+      ${/* v226：このカルテを人が見たかどうか。**Squareから自動でできたぶんだけ未確認になる** */""}
+      <div class="mo-row"><span>確認</span><div class="mo-val" id="k-chk-val">
+        ${/* ★ v226：`chk` は「済」を押したときだけでなく、**手書きカルテがSquareに格上げ
+             されたとき**（v188）にも付く。だから「押してあります」とは書けない */""}
+        ${kChecked(k)
+          ?`<b style="color:#4C8B3F">済（確認ずみ）</b>　<small style="color:var(--ink3)">${
+             k.src==="square"?"確認ずみの印が付いています":"手で入力したカルテです"}</small>
+            ${(k.chk&&k.src==="square")?`<button class="btn quiet" id="k-unchk" style="margin-left:10px">未確認にもどす</button>`:""}`
+          :`<b style="color:#A8500F">未確認</b>
+            <small style="color:var(--ink3)">Squareのお会計から自動でできたカルテです</small>
+            <button class="btn" id="k-chk" style="margin-left:10px">済にする</button>`}
+      </div></div>
       ${row("施術日",k.date.replace(/-/g,"/"))}
       ${row("担当",k.staff)}
       ${row("メニュー",(Array.isArray(k.menus)&&k.menus.length?k.menus.join("／"):k.menu)
@@ -3957,6 +4053,15 @@ function openKarteModal(id){
   /* v158：名簿へ飛ばすのをやめ、**そのお客様のカルテだけを並べて選べる**ようにした
      （名簿へ行くと「今日のカルテ」の入口や購入した商品まで出て、探しているものが埋もれる） */
   document.getElementById("k-cust").onclick=()=>openCustKarteList(k.cid);
+  /* v226：このカルテを「済」にする／もどす。★ 中身は触らない（印だけ） */
+  const kchkB=document.getElementById("k-chk");
+  if(kchkB) kchkB.onclick=async()=>{ await markKarteChecked(k.id); close(); openKarteModal(k.id); };
+  const kunB=document.getElementById("k-unchk");
+  if(kunB) kunB.onclick=async()=>{
+    delete k.chk;
+    await save(); renderKarte(); renderSched(); renderList();
+    close(); openKarteModal(k.id); toast("未確認にもどしました");
+  };
   /* v206：同じ日のカルテをひとつにまとめる（上の mergeCharts のおぼえがき参照） */
   ov.querySelectorAll("[data-kmerge]").forEach(b=>b.onclick=async()=>{
     const o=db.charts.find(x=>x.id===b.dataset.kmerge); if(!o) return;
@@ -4206,6 +4311,7 @@ Squareとの結びつきは両方とも残るので、取り込み直しても2�
         if(v.length) k[kind]=v; else delete k[kind];
       });
       k.goods=goodsText(k.goods,k.sales);
+      k.chk=1;                     /* v226：人が開いて直した＝確認ずみ */
       markVisited(k.cid,k.date);                                             /* v204 */
       syncKarteSales(k.date);
       if(m0&&m0!==String(k.date||"").slice(0,7)) syncKarteSales(m0+"-01");   /* v204 */
@@ -4221,6 +4327,50 @@ Squareとの結びつきは両方とも残るので、取り込み直しても2�
 /* ---------- 予約詳細（モーダル）とドラッグ移動 ---------- */
 const STAT=["予約完了","来店済み","キャンセル","無断キャンセル"];
 const statOf=a=>a.stat||(a.status==="cancel"?"キャンセル":"予約完了");
+
+/* ═══════════ カルテの「確認ずみ」（v226）═══════════
+   利用者の指示（2026-09-12）：
+   **「スケジュールの『済』は、カルテ入力が終わったら出るようにしてほしい。
+     Squareから自動でできたカルテは川口さんが関与していないのに一覧に出てくる。
+     そういうカルテに『済』ボタンを作って、押したらスケジュールに『済』と出してほしい。
+     そうすれば、どのカルテを自分が入力して、どれが勝手にできただけなのかが分かるし、漏れがなくなる」**
+
+   考え方はひとつだけ。**カルテを「人が見たかどうか」で分ける。**
+
+   ・手で作ったカルテ（`src!=="square"`）＝川口さんが自分の意思で打ったもの → **はじめから確認ずみ**
+   ・Squareの決済から自動でできたカルテ（`src==="square"`）→ **人が「済」を押すまで未確認**
+
+   ★ 印は `k.chk`。**古いカルテには無いので、無いときは `src` で決める。**
+     こうすると移行のコードが要らない（過去のSquareぶんは、そのまま「未確認」として並ぶ。
+     利用者が見たいのはまさにそこ）。
+   ★ 「済」を押しても、**金額も中身も1文字も変えない。** 見たという印だけを付ける。 */
+const kChecked=k=>!!(k&&(k.chk||k.src!=="square"));
+const kNeedChk=k=>!!(k&&!k.chk&&k.src==="square");
+const kartesOfAppt=a=>(db.charts||[]).filter(k=>k.cid===a.cid&&k.date===a.date);
+/* スケジュールの札に「済」を出すかどうか。**カルテの確認ずみで決める。**
+   ★ カルテが1件も無いときだけ、人が予約詳細で選んだステータス（来店済み）を見る。
+     「来たけれどカルテはまだ」を手で印だけ付けている場合に、それを消さないため。
+   ★ `a.stat` そのものは今までどおり（v204のまま）。**札の意味だけが変わった**＝
+     「来た」ではなく「カルテを確認した」 */
+function apDone(a){
+  const ks=kartesOfAppt(a);
+  if(ks.length) return ks.some(kChecked);
+  return statOf(a)==="来店済み";
+}
+/* 「済」を押したとき。★ ここが唯一の入口（カルテ一覧・カルテ詳細・予約詳細の3か所から呼ぶ） */
+async function markKarteChecked(id){
+  const k=(db.charts||[]).find(x=>x.id===id); if(!k) return false;
+  k.chk=1;
+  /* ★ v226：**ここで予約に触らない。** はじめ `markVisited` を呼んでいたが、
+     それは予約に `stat:"来店済み"` と `edited:{stat:1}` を書き込む＝
+     「押しても中身は1文字も変わりません」と言いながら**予約を書き換えていた**。
+     札の「済」は `apDone`＝カルテの確認ずみで決まるので、ここは印だけでよい。
+     （Squareの取り込みが `markVisited` を呼ぶのは今までどおり・v204） */
+  await save();
+  renderKarte(); renderSched(); renderList();
+  toast("カルテを「済」にしました");
+  return true;
+}
 /* ---------- カルテを書いたら「来店済み」にする（v204） ----------
    これまで「来店済み」は**予約詳細を開いてプルダウンを選び、「ステータス更新」を押す**
    しか道が無かった。施術のあとに毎回それをやる人はいないので、
@@ -4282,6 +4432,18 @@ function drawApModal(){
         ${c&&c.tel?`<br>連絡先: ${telFmt(c.tel)}`:""}
         ${c&&c.caution?`<br><b style="color:var(--alert)">注意事項: ${esc(c.caution)}</b>`:""}</div></div>
       <div class="mo-row"><span>スタッフ</span><div class="mo-val">${esc(a.staff||"—")}</div></div>
+      ${/* v226：この日のカルテの状態。**スケジュールの「済」はここで決まる。**
+           未確認のカルテがあれば、この画面からそのまま「済」を押せる */""}
+      <div class="mo-row"><span>カルテ</span><div class="mo-val">${(()=>{
+        const ks=kartesOfAppt(a);
+        if(!ks.length) return `<small style="color:var(--ink3)">この日のカルテはまだありません（下の「カルテ作成」から作れます）</small>`;
+        const need=ks.filter(kNeedChk);
+        return ks.map(k=>`${esc(k.date.replace(/-/g,"/"))}　${esc((karteTitle(k)||"").slice(0,26))}　${
+          kChecked(k)?`<b style="color:#4C8B3F">済</b>`:`<b style="color:#A8500F">未確認</b>`}`).join("<br>")
+          +(need.length?`<div class="actions" style="margin-top:8px">${need.map(k=>
+            `<button class="btn" data-apok="${k.id}">このカルテを済にする</button>`).join("")}</div>
+            <small style="color:var(--ink3)">Squareのお会計から自動でできたカルテです。中身を見て、これでよければ押してください</small>`:"");
+      })()}</div></div>
       <div class="mo-row"><span>登録日時</span><div class="mo-val">${esc(a.created||"—")}</div></div>
       ${a.note?`<div class="mo-row"><span>メモ</span><div class="mo-val">${esc(a.note)}</div></div>`:""}
       <div id="mo-form"></div>
@@ -4298,6 +4460,11 @@ function drawApModal(){
   document.getElementById("mo-x").onclick=closeApModal;
   document.getElementById("mo-close").onclick=closeApModal;
 
+  /* v226：予約詳細から、その日のカルテを「済」にする */
+  ov.querySelectorAll("[data-apok]").forEach(b=>b.onclick=async()=>{
+    await markKarteChecked(b.dataset.apok);
+    drawApModal();                       /* 開いたまま状態だけ描き直す */
+  });
   document.getElementById("mo-stat-save").onclick=async()=>{
     const v=document.getElementById("mo-stat").value;
     a.stat=v; a.status=/キャンセル/.test(v)?"cancel":"";
@@ -9838,6 +10005,11 @@ async function syncOrders(from,to,opt){
       if(keep.length) hand.note=(keep.join(NL)+(hand.note?NL+hand.note:"")).trim();
       /* v206：`o.total` をそのまま入れていたので、中継役が**文字列**を返すと
          カルテの金額が文字列になり、あとの足し算が「0」+「1000」＝"01000" になっていた */
+      /* ★ v226：**ここで `src` が "square" に変わる。** 印を付けずに通すと、
+         川口さんが手で書いたカルテが、取り込んだ瞬間に「未確認」に化けてしまう
+         （確認ずみかどうかは、印が無いとき `src` で決めているため）。
+         手で書いたものは**書いた時点で確認ずみ**なので、ここで印を残す */
+      hand.chk=1;
       hand.src="square"; hand.sqid=o.sqid; hand.price=NUM(o.total); hand.cash=cashAmt;
       hand.menu=sqMenu; hand.menus=menus; hand.opts=opts; hand.goods=sqGoods;
       if(sales.length) hand.sales=sales; else delete hand.sales;
@@ -12396,10 +12568,22 @@ function cpGiveHtml(){
     ${all.length>60?`<p class="note">新しい順に60件だけ出しています（ぜんぶで ${all.length}件）。</p>`:""}`;
 }
 
+/* ═══ リッチメニューの行き先の既定（v224・利用者の指示 2026-09-11）═══
+   毎回ここに貼る作業を無くすために、2つのURLをソースに焼いた。
+   ★ 入るのは **空のときだけ・1端末につき1回だけ**（ensureLine の db.rmver）。
+     人が入れた値も、人が消したことも、上書きしない。
+   ★ 引っ越しや店舗の変更で差し替えるときは、**この2行だけ**直せばよい。
+     サブの公式アカウント（@454llyli）でも本番（@072ckzvx）でも中身は同じ
+     （base はお客様ページの置き場所、book はホットペッパーのサロンページ）。
+   ★ book は 2026-09-11 に実物で確かめた（HTTP 200・「サロン ド コウ(Salon de KOU)」） */
+const RM_BASE0="https://hibihoken-lang.github.io/kou";
+const RM_BOOK0="https://beauty.hotpepper.jp/kr/slnH000758836/";
+
 const LINE0={
   oaId:"", rmOffset:1, tone:"luxury", sign:"salon de kou", signOn:true,
   richOn:true, remindImg:"",
-  /* リッチメニュー（v222）。★ サブの公式アカウントと本番で差し替えるのは base と book だけ */
+  /* リッチメニュー（v222）。★ サブの公式アカウントと本番で差し替えるのは base と book だけ
+     ★ ここは空のまま。既定は ensureLine が RM_BASE0／RM_BOOK0 から1回だけ入れる（v224） */
   rm:{layout:"kou5", base:"", book:"", title:"salon de kou", chatBarText:"メニュー",
       ink:"#5C5045", lastId:"", lastAt:""},
   nextMode:"normal",
@@ -12445,6 +12629,15 @@ function ensureLine(){
   s.rm=Object.assign({layout:"kou5",base:"",book:"",title:"salon de kou",
                       chatBarText:"メニュー",ink:"#5C5045",lastId:"",lastAt:""}, s.rm||{});
   if(!RMLAY[s.rm.layout]) s.rm.layout="kou5";
+  /* v224：行き先の既定を **空のときだけ・1回だけ** 入れる。
+     ★ 毎回入れてはいけない。ensureLine は renderLine のたびに通るので、
+       人が消した値をそのつど勝手に戻してしまう。
+       db.rmver で1回に限る（セグメント segver ・クーポン cpver と同じ考え方） */
+  if(db.rmver!==224){
+    if(!String(s.rm.base||"").trim()) s.rm.base=RM_BASE0;
+    if(!String(s.rm.book||"").trim()) s.rm.book=RM_BOOK0;
+    db.rmver=224;
+  }
   db.line=s;
   if(!db.linesent||typeof db.linesent!=="object") db.linesent={};
   cpGiveInit();
@@ -14380,6 +14573,13 @@ function bindPace(el){
 
 
 /* ---------- Gmailからホットペッパーの予約を取り込む ---------- */
+/* v226：取り込んだお客様のお名前を、知らせの文にする。
+   ★ 長くなりすぎないよう3名まで。残りは「ほかN名」 */
+function impWho(r){
+  const n=(r&&r.names)||[];
+  if(!n.length) return "";
+  return `（${n.slice(0,3).join("・")}${n.length>3?` ほか${n.length-3}名`:""}）`;
+}
 const tel10=t=>String(t||"").replace(/[^0-9]/g,"");
 function matchCustomer(name,kana,tel){
   const t=tel10(tel);
@@ -14417,7 +14617,9 @@ async function autoFetchMail(){
     if(r.upd) bits.push(`変更${r.upd}件`);
     if(r.cancel) bits.push(`取消${r.cancel}件`);
     if(r.newc) bits.push(`新規のお客様${r.newc}名`);
-    if(bits.length) toast("予約メールから "+bits.join("／")+" を取り込みました");
+    /* v226：**誰を取り込んだのか**をその場で出す（利用者の指示）。
+       件数だけではメールを見に行くしかなかった。スケジュールでは当日だけ枠が付く */
+    if(bits.length) toast("予約メールから "+bits.join("／")+" を取り込みました"+impWho(r));
   }catch(e){ /* 通信できないときは黙って見送る */ }
 }
 async function fetchMail(days){
@@ -14454,10 +14656,18 @@ function diffOf(a,x){
 }
 function applyMail(rows){
   let add=0,upd=0,cancel=0,newc=0,revive=0;
+  /* ★ v226：**取り込んだ日**を予約に控える（`a.imp`）。スケジュールの札に枠が付く。
+     利用者の指示：「アプリを開けたら『予約を取り込みました』と出るが、
+     誰を取り込んだのか結局メールを見に行かないと分からない。
+     当日取り込んだ予約だけ色を変えておけば『この人を取り込んだんだ』と直感的に分かる」。
+     ★ 当日しか光らないので、あとで消す手入れは要らない（`a.imp===today()` で見ている）。
+     ★ 名前も一緒に返して、そのまま知らせに出す */
+  const imp=today(); const names=[]; const noteName=n=>{ if(n&&!names.includes(n)) names.push(n); };
   rows.forEach(x=>{
     const exist=findAppt(x);
     if(x.kind==="cancel"){
-      if(exist){ exist.status="cancel"; exist.mailId=x.id; cancel++; }
+      if(exist){ exist.status="cancel"; exist.mailId=x.id; exist.imp=imp; cancel++;
+                 noteName(exist.name||x.name); }
       return;
     }
     let c=x.cid?db.customers.find(y=>y.id===x.cid):null;
@@ -14518,10 +14728,21 @@ function applyMail(rows){
            return しているので、この行はそれを邪魔しない */
       status:(exist&&(ed.stat||/キャンセル/.test(exist.stat||"")))?(exist.status||""):""};
     if(x.kana&&!c.kana) c.kana=x.kana;
-    if(exist){ if(exist.status==="cancel") revive++; Object.assign(exist,o); upd++; }
-    else { db.appts.push(Object.assign({id:uid(),created:nowStamp()},o)); add++; }
+    if(exist){
+      if(exist.status==="cancel") revive++;
+      /* ★ v226：**中身が本当に変わったときだけ**「今日取り込んだ」印を付ける。
+         人が手で直した欄（`a.edited`）はメールで上書きしない（v158）ので、
+         その予約は**いつまでも「差分あり」**と見なされ、毎朝ここを通る。
+         無条件に印を付けると、**何も取り込んでいないのに毎日枠が光る** */
+      const b4=JSON.stringify(exist);
+      Object.assign(exist,o);
+      if(JSON.stringify(exist)!==b4) exist.imp=imp;
+      upd++;
+    }
+    else { db.appts.push(Object.assign({id:uid(),created:nowStamp()},o,{imp})); add++; }
+    noteName(c.name);
   });
-  return {add,upd,cancel,newc,revive};
+  return {add,upd,cancel,newc,revive,names};
 }
 
 function renderMailBox(){
@@ -14599,7 +14820,7 @@ function renderMailBox(){
           if(r.cancel) bits.push(`取消 ${r.cancel}件`);
           if(r.newc) bits.push(`新しいお客様 ${r.newc}名`);
           const t=bits.length
-            ? `スケジュールに反映しました：${bits.join("／")}。スケジュールタブで確認できます`
+            ? `スケジュールに反映しました：${bits.join("／")}${impWho(r)}。スケジュールでは今日のぶんに枠が付きます`
             : "反映しましたが、変わったところはありませんでした（すでに同じ内容が入っています）";
           msg(t,!!bits.length); toast(t);
           btn.textContent="反映しました";
