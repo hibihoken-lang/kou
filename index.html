@@ -934,7 +934,7 @@
 /* このファイルの版。ファイル名の番号（salon-de-kou-karte_NN.html）と必ずそろえること。
    仕分け待ちの下書きを捨てるかどうかの判定（BUYVER）にも使うので、
    ここを上げ忘れると、古い読み取りで作られた下書きが生き残る（v87でやらかした） */
-const APPVER=226;
+const APPVER=230;
 const KEY="sdk:data";
 /* ★ v133：QC／SEED／PROD／MENU／QK／CHARTS0／STOCK0／ACTUAL／VISITS は
    **わざと空にしてあります。書き戻さないこと。**
@@ -1448,6 +1448,53 @@ async function load(){
   }catch(e){ /* まだ何も保存されていない状態 */ }
   normalizeDb();
 }
+/* ═══════ 月初の引き継ぎを自動にする（v230）═══════
+   ★★ 2026-09-12、利用者の指摘「いつからかアプリの商品在庫の数がゼロになってる」。
+     調べたら **消えていなかった。9月の「月初」が1品目も入っていなかった**（83品目すべて
+     `{open:0,in:0,…}` のまま）。8月は無傷（物販122個・材料66個）。
+
+   原因：**月初の引き継ぎが手押しのボタンだけだった**
+   （在庫タブの「前月の月末を月初に取り込む」）。9月に入って誰も押さなかったので、
+   9月はまっさらなまま始まり、Squareの販売1件だけが入って**在庫がマイナス**になっていた。
+   ★ しかも在庫カードには「月初・入荷は自動で入ります」と**書いてあった**（実際は手押し）。
+     画面の説明と中身が食い違っていた。
+
+   直しかた：**月が変わったら、前月の月末を今月の月初に自動で入れる。**
+     ★ 入れるのは**空いているところだけ**（月初が 0 で、前月の月末が 0 でない品目）。
+       人が入れた数字は書き換えない
+     ★ **1つの月につき1回だけ**（`db.carried`）。あとから人が 0 に直したら、そのままにする
+     ★ **今月より先の月は触らない**（10月を先に埋めると、9月の残りの動きが乗らなくなる）
+     ★★ **過去の月には一切さわらない。** 初回に「引き継ぎずみ」の印だけを付ける
+       （締めた月の月初を動かすと、月末在庫→粗利→支払明細まで変わってしまうため） */
+function autoCarryStock(){
+  if(!db.carried||typeof db.carried!=="object") db.carried={};
+  const now=today().slice(0,7);
+  /* 初回だけ：**いまある過去の月は「引き継ぎずみ」とみなす**（数字は1つも触らない） */
+  if(db.carriedInit!==1){
+    Object.keys(db.stock||{}).forEach(m=>{ if(m<now) db.carried[m]=1; });
+    db.carriedInit=1;
+  }
+  const months=[...new Set([...Object.keys(db.stock||{}),now])].filter(m=>m<=now).sort();
+  const kinds=(db.products||[]).filter(p=>STOCKKIND(p.kind));
+  let n=0; const done=[];
+  months.forEach(m=>{
+    if(db.carried[m]) return;
+    const prev=shiftMonth(m,-1);
+    if(!db.stock[prev]) return;                 // 前月のデータが無ければ何もしない
+    let k=0;
+    kinds.forEach(p=>{
+      const pc=db.stock[prev][p.id]; if(!pc) return;
+      const e=endQty(pc); if(!e) return;         // 引き継ぐものが無い
+      const c=cell(m,p.id);
+      if((+c.open||0)!==0) return;               // ★ 人が入れた数字は触らない
+      c.open=e; k++;
+    });
+    db.carried[m]=1;
+    if(k){ n+=k; done.push(m); }
+  });
+  return {n,months:done};
+}
+
 /* v132：クラウドから受け取ったデータにも同じ手当てが要るので、load から切り出した */
 function normalizeDb(){
   if(!db.customers) db.customers=[];
@@ -1459,6 +1506,8 @@ function normalizeDb(){
   /* v222：クーポンの配布記録。ここに書いておかないと、
      クラウドから受け取ったデータ（この欄が無い版で保存されたもの）で落ちる */
   if(!Array.isArray(db.cpgive)) db.cpgive=[];
+  /* v228：振替の控え。この欄が無い版で保存されたデータでも落ちないようにする */
+  if(!Array.isArray(db.swaps)) db.swaps=[];
   /* v132：ソースに焼き込んでいた「手で控えた月次売上」を、1回だけデータへ移す。
      こうしておくと、本体から ACTUAL を外しても過去の月の売上が消えない */
   if(!db.actual) db.actual=Object.assign({}, (typeof ACTUAL!=="undefined"?ACTUAL:{}));
@@ -1469,6 +1518,9 @@ function normalizeDb(){
   if(!db.relay) db.relay={url:"",key:""};
   ensureLine();
   if(!db.hpb) db.hpb={};
+  /* v230：月が変わったら月初を自動で引き継ぐ。**ここに置くと、端末の写しから開いたときも、
+     正本や他の端末から受け取ったときも、必ず通る**（normalizeDb は3つの入口ぜんぶが通る） */
+  autoCarryStock();
   if(!db.cashbook) db.cashbook={opening:{},entries:[]};
   if(!db.cashbook.actual) db.cashbook.actual={};
   if(!db.cashbook.sq){                       // Squareの現金決済（決済ID→日付・金額・お客様）
@@ -4798,9 +4850,13 @@ function cell(m,pid){
   db.stock[m][pid]=db.stock[m][pid]||{open:0,in:0,adv:0,sold:0,gift:0,use:0,staff:0};
   return db.stock[m][pid];
 }
+/* v228：振替（ばらし）で動いたぶん。`swin`＝振替で入った数、`swout`＝振替で出した数。
+   ★ 古い月には無い欄なので 0 になる＝**過去の数字はいっさい動かない**（`loss` と同じ入れ方） */
+const SWIN=c=>+c.swin||0, SWOUT=c=>+c.swout||0;
 /* 帳簿の月末（数える前）。棚卸しで実数を入れると、その差が loss に入る（v128）。
    loss を持っていない過去のデータは 0 として扱うので、今までの月の数字は動かない */
-const bookQty=c=>c.open+c.in-c.sold-c.gift-c.use-c.staff;
+/* v228：`+swin -swout` を足した。振替（ばらし）で増えた／減った数を帳簿に載せる */
+const bookQty=c=>c.open+c.in+SWIN(c)-c.sold-c.gift-c.use-c.staff-SWOUT(c);
 const endQty=c=>bookQty(c)-(+c.loss||0);
 
 /* ---------- 月末の棚卸し（v128） ----------
@@ -4815,7 +4871,9 @@ const endQty=c=>bookQty(c)-(+c.loss||0);
 
    数え終わったものは cntAt（数えた日）が入る。実数を入れると帳簿との差が loss に入り、
    月末在庫が実数にそろう。 */
-const MOVEF=["in","sold","gift","use","staff","loss"];
+/* v228：振替も「この月に動いた」に数える。数えないと、ばらしただけの商品が
+   棚卸しの対象から外れて「先月のまま合っている」と誤解される */
+const MOVEF=["in","sold","gift","use","staff","loss","swin","swout"];
 function stMoved(m,pid){
   const c=cell(m,pid);
   const fields=MOVEF.filter(f=>Math.round(+c[f]||0)!==0);
@@ -5231,7 +5289,10 @@ function breakdown(k,total){
    商品のところで入力した結果だけをわかればよい」**
    → **スタッフ購入のタブをやめた。** 入れるのは商品・材料のカードの「スタッフ」欄、
    見るのは商品・材料タブの上に出る**結果の表**だけ。 */
-const INVTABS=[["商品","物販"],["材料","材料"],["棚卸し",""],["消耗品","消耗品"]];
+/* v228：**振替**（ばらし）を1ページ立てた。利用者の指示：
+   「ワコナル10包をばらしてワコナル1個にして売る。そうするとワコナル1個が10個ある。
+     いまの商品管理で振り分けるのが手間だから、振替という項目を作ってほしい」 */
+const INVTABS=[["商品","物販"],["材料","材料"],["振替",""],["棚卸し",""],["消耗品","消耗品"]];
 let invTab="商品";
 function renderInv(){
   const host=document.getElementById("stock"); if(!host) return;
@@ -5246,6 +5307,7 @@ function renderInv(){
         ${kind?`<em>${db.products.filter(x=>x.kind===kind).length}</em>`
               :t==="棚卸し"?(()=>{const c=stCountSum(stMonth,["物販","材料"]);
                   return c.todo?`<em style="color:var(--alert)">${c.todo}</em>`:`<em>${c.move}</em>`;})()
+              :t==="振替"?(()=>{const n=swapsOf(stMonth).length; return n?`<em>${n}</em>`:"";})()
               :""}</button>`).join("")}
     </div><div id="invbody"></div>`;
   const ib=document.getElementById("inv-back");
@@ -5256,6 +5318,7 @@ function renderInv(){
   stHost="invbody";
   if(invTab==="レシピ"){ rcHost="invbody"; renderRecipe(); return; }
   if(invTab==="棚卸し"){ renderCount(); return; }
+  if(invTab==="振替"){ renderSwap(); return; }
   stKinds=[(INVTABS.find(x=>x[0]===invTab)||["","物販"])[1]];
   renderStock();
 }
@@ -5753,6 +5816,187 @@ function stSimple(m){
     ${stockTbl("材料")}`;
 }
 
+/* ══════════════ 振替（ばらし・v228）══════════════
+   利用者の指示（2026-09-12）：
+   **「ワコナル10包をばらして、ワコナル1個にして売る。そうするとワコナル1個が10個あることになる。
+     これが今の商品管理で振り分けるのが手間だから、商品管理で『振替』という項目を作って、
+     ワコナル10包が1個を、ワコナル1包が10個にする振り分けを作って」**
+
+   ★ 考え方はひとつだけ。**物は同じで、数え方だけが変わる。**
+     だから **在庫の金額は1円も変わってはいけない。**
+       出す側：1個 × 仕入 3,000円 ＝ 3,000円
+       入れる側：10個 × 仕入 300円 ＝ 3,000円
+     この2つがそろっていないと、ばらすたびに在庫の金額が増えたり減ったりする。
+     そこで、そろっていないときは**入れる側の仕入単価を自動で合わせる**ようにした
+     （＝人が割り算をしなくてよい）。
+
+   ★ 数の出入りは `swin`／`swout` という**専用の欄**に入れる。
+     「入荷」や「販売」に混ぜない。混ぜると、仕入れていないのに仕入れたことになり、
+     売っていないのに売ったことになる（月の締めの数字が狂う）。
+
+   ★ **取り消せる。** 控え（`db.swaps`）を持っているので、1件ずつ元に戻せる。 */
+let swFrom="", swTo="", swFq=1, swTq=10, swNote="", swFix=true;
+const swapsOf=m=>(db.swaps||[]).filter(x=>x.m===m);
+const swProducts=()=>db.products.filter(p=>p.kind==="物販"||p.kind==="材料");
+const swName=id=>{const p=db.products.find(x=>x.id===id); return p?p.n:"（消えた商品）";};
+
+/* 金額の見合い。出す側の金額を、入れる側が何個で受けるか */
+function swCalc(){
+  const m=stMonth;
+  const f=db.products.find(x=>x.id===swFrom), t=db.products.find(x=>x.id===swTo);
+  const fq=Math.round(+swFq||0), tq=Math.round(+swTq||0);
+  const fc=f?costAt(f.id,m):0, tc=t?costAt(t.id,m):0;
+  const fAmt=fc*fq, tAmt=tc*tq;
+  const want=tq>0?Math.round(fAmt/tq):0;            // 入れる側をいくらにすれば釣り合うか
+  return {m,f,t,fq,tq,fc,tc,fAmt,tAmt,want,gap:tAmt-fAmt};
+}
+
+function renderSwap(){
+  const el=document.getElementById(stHost); if(!el) return;
+  const list=swProducts();
+  const c=swCalc();
+  const opt=(sel)=>`<option value="">（選んでください）</option>`+list.map(p=>
+    `<option value="${p.id}"${p.id===sel?" selected":""}>${esc(p.n)}（${p.kind}・在庫 ${
+      endQty(cell(stMonth,p.id))}・仕入 ${yen(costAt(p.id,stMonth))}）</option>`).join("");
+  const hist=swapsOf(stMonth).slice().reverse();
+  el.innerHTML=`
+    <div class="sheet">
+      <div class="divider" style="margin-top:0"><h2>振替　${stMonth.replace("-","年")}月</h2></div>
+      <p class="note" style="margin-top:0">
+        <b>まとめ買いの箱をばらして、1個ずつ売るときに使います。</b>
+        たとえば「ワコナル10包」を1個ばらすと「ワコナル1包」が10個になります。
+        出す側の数を減らし、入れる側の数を増やします。<br>
+        ★ <b>入荷や販売の欄には入りません。</b>仕入れたことにも、売ったことにもなりません。
+        物は同じで、数え方が変わるだけだからです。<br>
+        ★ <b>在庫の金額は変わりません。</b>入れる側の仕入単価が合っていないときは、
+        こちらで計算して合わせます（下に出ます）。
+      </p>
+      <div class="grid">
+        <label class="wide"><span class="f">出す商品（ばらすほう）</span>
+          <select class="f-in" id="sw-from">${opt(swFrom)}</select></label>
+        <div><label class="f" for="sw-fq">出す数</label>
+          <input class="f-in" id="sw-fq" type="number" step="1" min="1" value="${swFq}"></div>
+        <div></div>
+        <label class="wide"><span class="f">入れる商品（ばらしたあと）</span>
+          <select class="f-in" id="sw-to">${opt(swTo)}</select></label>
+        <div><label class="f" for="sw-tq">入れる数</label>
+          <input class="f-in" id="sw-tq" type="number" step="1" min="1" value="${swTq}"></div>
+        <div></div>
+        <label class="wide"><span class="f">メモ（任意）</span>
+          <input class="f-in" id="sw-note" value="${esc(swNote)}" placeholder="例：店頭用にばらした"></label>
+      </div>
+      <div id="sw-calc">${swCalcHtml()}</div>
+      <div class="actions" style="margin-top:10px">
+        <button class="btn" id="sw-go"${(c.f&&c.t&&c.fq>0&&c.tq>0&&c.f.id!==c.t.id)?"":" disabled"}>振り替える</button>
+      </div>
+    </div>
+    <div class="sheet">
+      <div class="divider" style="margin-top:0"><h2>この月の振替　${hist.length}件</h2></div>
+      ${hist.length?`<table class="chk an"><thead><tr>
+          <th>日付</th><th>出したもの</th><th>入れたもの</th><th>金額</th><th>メモ</th><th></th></tr></thead>
+        <tbody>${hist.map(x=>`<tr>
+          <th>${esc(String(x.date||"").replace(/-/g,"/"))}</th>
+          <td>${esc(swName(x.fid))}　−${x.fq}</td>
+          <td>${esc(swName(x.tid))}　＋${x.tq}</td>
+          <td>${yen(+x.amt||0)}</td>
+          <td>${esc(x.note||"")}</td>
+          <td><button class="btn quiet" data-swundo="${x.id}">取り消す</button></td></tr>`).join("")}
+        </tbody></table>`
+      :`<p class="note" style="margin:0">この月の振替はまだありません。</p>`}
+    </div>`;
+
+  const set=(id,f)=>{const e=document.getElementById(id); if(e) e.onchange=()=>{f(e.value); renderSwap();};};
+  set("sw-from",v=>swFrom=v); set("sw-to",v=>swTo=v);
+  set("sw-fq",v=>swFq=Math.max(1,Math.round(+v||1)));
+  set("sw-tq",v=>swTq=Math.max(1,Math.round(+v||1)));
+  const nt=document.getElementById("sw-note"); if(nt) nt.oninput=()=>swNote=nt.value;
+  const fx=document.getElementById("sw-fix"); if(fx) fx.onchange=()=>{swFix=fx.checked;};
+  const go=document.getElementById("sw-go"); if(go) go.onclick=doSwap;
+  el.querySelectorAll("[data-swundo]").forEach(b=>b.onclick=()=>undoSwap(b.dataset.swundo));
+}
+
+/* 金額の見合いの表示。**ここだけで「いくらになるか」を全部見せる** */
+function swCalcHtml(){
+  const c=swCalc();
+  if(!c.f||!c.t) return `<p class="note" style="margin:8px 0 0">出す商品と入れる商品を選んでください。</p>`;
+  if(c.f.id===c.t.id) return `<p class="note" style="margin:8px 0 0;color:var(--alert)">
+    <b>同じ商品どうしでは振り替えられません。</b>ばらしたあとの商品を別に作ってから選んでください
+    （「商品」タブの「＋商品を追加」）。</p>`;
+  const fEnd=endQty(cell(c.m,c.f.id)), tEnd=endQty(cell(c.m,c.t.id));
+  const short=c.fq>fEnd;
+  return `<table class="chk an" style="margin-top:10px"><tbody>
+    <tr><th style="width:110px">出す</th><td><b>${esc(c.f.n)}</b>　${c.fq}個 × ${yen(c.fc)} ＝ <b>${yen(c.fAmt)}</b>
+      <br><small style="color:var(--ink3)">在庫 ${fEnd} → ${fEnd-c.fq}</small>
+      ${short?`<br><b style="color:var(--alert)">在庫が足りません（${fEnd}個しかありません）</b>`:""}</td></tr>
+    <tr><th>入れる</th><td><b>${esc(c.t.n)}</b>　${c.tq}個 × ${yen(c.tc)} ＝ <b>${yen(c.tAmt)}</b>
+      <br><small style="color:var(--ink3)">在庫 ${tEnd} → ${tEnd+c.tq}</small></td></tr>
+    <tr><th>在庫の金額</th><td>${c.gap===0
+      ? `<b style="color:var(--accent)">変わりません（差 ¥0）</b>`
+      : `<b style="color:var(--alert)">${c.gap>0?"＋":""}${yen(c.gap)} ずれます</b>
+         <br><label style="display:inline-flex;gap:6px;align-items:center;margin-top:6px;cursor:pointer">
+           <input type="checkbox" id="sw-fix"${swFix?" checked":""}>
+           <span><b>${esc(c.t.n)}</b> の仕入単価を <b>${yen(c.want)}</b> に合わせる
+           （${yen(c.fAmt)} ÷ ${c.tq}個）</span></label>
+         <br><small style="color:var(--ink3)">合わせないと、ばらすたびに在庫の金額が動きます。
+         ★ 前の月の原価は変わりません（${c.m.replace("-","年")}月より前には、いまの単価を焼き込んでから入れ替えます）</small>`}</td></tr>
+  </tbody></table>`;
+}
+
+async function doSwap(){
+  const c=swCalc();
+  if(!c.f||!c.t||c.f.id===c.t.id||c.fq<=0||c.tq<=0) return;
+  const fEnd=endQty(cell(c.m,c.f.id));
+  const fixing=c.gap!==0&&swFix;
+  if(!confirm(`${c.m.replace("-","年")}月の在庫を、こう振り替えます。
+
+　出す　 ${c.f.n}　${c.fq}個（在庫 ${fEnd} → ${fEnd-c.fq}）
+　入れる ${c.t.n}　${c.tq}個（在庫 ${endQty(cell(c.m,c.t.id))} → ${endQty(cell(c.m,c.t.id))+c.tq}）
+${fixing?`
+　★ ${c.t.n} の仕入単価を ${yen(c.want)} に合わせます（在庫の金額を変えないため）`:""}${
+  c.fq>fEnd?`
+
+　★ 出す数が在庫より多いです（${fEnd}個しかありません）。このまま進めると在庫がマイナスになります。`:""}
+
+仕入れ・販売の数には入りません。あとから「取り消す」で元に戻せます。
+よろしいですか？`)) return;
+
+  /* ★ 先に原価をそろえる。**入れ替える前の単価を、この月より前に焼き込んでから**変える
+     （v204 と同じ道。そうしないと締めた月の原価まで書き換わる） */
+  let fixed=0;
+  if(fixing){
+    lockCostsBeforeChange([c.t.id],c.m);
+    c.t.cost=c.want; fixed=c.want;
+  }
+  const cf=cell(c.m,c.f.id), ct=cell(c.m,c.t.id);
+  cf.swout=(+cf.swout||0)+c.fq;
+  ct.swin =(+ct.swin ||0)+c.tq;
+  /* 棚卸しずみなら、数えた実数はそのままに差だけ計算し直す（v128と同じ扱い） */
+  [cf,ct].forEach(x=>{ if(x.cntAt&&!(x.cnt===undefined||x.cnt===null||x.cnt==="")) x.loss=bookQty(x)-(+x.cnt||0); });
+  db.swaps.push({id:uid(), m:c.m, date:(c.m===today().slice(0,7)?today():c.m+"-01"),
+    fid:c.f.id, fq:c.fq, tid:c.t.id, tq:c.tq, amt:costAt(c.f.id,c.m)*c.fq,
+    note:swNote.trim(), fixed, at:nowStamp()});
+  swNote="";
+  await save(); renderInv();
+  toast(`${c.f.n} ${c.fq}個 → ${c.t.n} ${c.tq}個 に振り替えました`);
+}
+
+async function undoSwap(id){
+  const x=(db.swaps||[]).find(y=>y.id===id); if(!x) return;
+  if(!confirm(`この振替を取り消します。
+
+　${swName(x.fid)}　＋${x.fq}（戻す）
+　${swName(x.tid)}　−${x.tq}
+
+★ 仕入単価は戻しません（合わせた単価はそのままです）。
+よろしいですか？`)) return;
+  const cf=cell(x.m,x.fid), ct=cell(x.m,x.tid);
+  cf.swout=Math.max(0,(+cf.swout||0)-x.fq);
+  ct.swin =Math.max(0,(+ct.swin ||0)-x.tq);
+  [cf,ct].forEach(c2=>{ if(c2.cntAt&&!(c2.cnt===undefined||c2.cnt===null||c2.cnt==="")) c2.loss=bookQty(c2)-(+c2.cnt||0); });
+  db.swaps=db.swaps.filter(y=>y.id!==id);
+  await save(); renderInv(); toast("振替を取り消しました");
+}
+
 function renderStock(){
   const el=document.getElementById(stHost);
   if(!el) return;
@@ -5794,10 +6038,14 @@ function renderStock(){
       ${open?`<div class="pe">
         ${FIELDS.map(([f,l])=>`<label><span>${f==="use"?USELBL():l}</span>
           <input type="number" step="1" data-p="${p.id}" data-f="${f}" value="${c[f]||""}" placeholder="0"></label>`).join("")}
+        ${(SWIN(c)||SWOUT(c))?`<label class="calc"><span>振替</span><b>${
+          [SWIN(c)?`＋${SWIN(c)}`:"",SWOUT(c)?`−${SWOUT(c)}`:""].filter(Boolean).join("　")
+        }</b></label>`:""}
         <label class="calc"><span>月末</span><b>${e}</b></label>
         ${sup?"":`<label class="wide"><span></span><span class="note" style="margin:0">
           手で入れるのは <b>${USELBL()}</b> と <b>スタッフ</b> の2つだけ。
-          ほかは自動で入ります（月初・入荷＝仕入れ／販売＝Squareとカルテ／プレゼント＝カルテ）。
+          ほかは自動で入ります（<b>月初＝前月の月末（v230から自動）</b>／入荷＝仕入れ／
+          販売＝Squareとカルテ／プレゼント＝カルテ）。
           入れた時点で保存されます（決定ボタンはありません）。</span></label>`}
         <label class="wide"><span>商品名</span>
           <input type="text" data-p="${p.id}" data-f="n" value="${esc(p.n)}" style="text-align:left"></label>
