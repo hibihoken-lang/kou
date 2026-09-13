@@ -934,7 +934,7 @@
 /* このファイルの版。ファイル名の番号（salon-de-kou-karte_NN.html）と必ずそろえること。
    仕分け待ちの下書きを捨てるかどうかの判定（BUYVER）にも使うので、
    ここを上げ忘れると、古い読み取りで作られた下書きが生き残る（v87でやらかした） */
-const APPVER=230;
+const APPVER=232;
 const KEY="sdk:data";
 /* ★ v133：QC／SEED／PROD／MENU／QK／CHARTS0／STOCK0／ACTUAL／VISITS は
    **わざと空にしてあります。書き戻さないこと。**
@@ -12972,7 +12972,7 @@ async function pullInbox(){
 }
 async function bindLine(cid,userId){
   const c=db.customers.find(x=>x.id===cid);
-  await relayGet("bind",`&c=${cid}&u=${encodeURIComponent(userId)}&name=${encodeURIComponent(c.name)}`);
+  await relayGet("bind",`&cid=${cid}&u=${encodeURIComponent(userId)}&name=${encodeURIComponent(c.name)}`);
   c.lineId=userId; await save();
 }
 async function pullLinks(){
@@ -13142,8 +13142,8 @@ async function markLineSent(k){
    中継役 v23 以上が要る。古いままだと文字だけ届く */
 async function lineSend(cids,text,img){
   const q=img&&/^https:\/\//.test(img)?`&img=${encodeURIComponent(img)}`:"";
-  if(cids.length===1) { await relayGet("push",`&c=${cids[0]}&text=${encodeURIComponent(text)}${q}`); return 1; }
-  const j=await relayGet("multicast",`&c=${cids.join(",")}&text=${encodeURIComponent(text)}${q}`);
+  if(cids.length===1) { await relayGet("push",`&cid=${cids[0]}&text=${encodeURIComponent(text)}${q}`); return 1; }
+  const j=await relayGet("multicast",`&cid=${cids.join(",")}&text=${encodeURIComponent(text)}${q}`);
   return j.sent||cids.length;
 }
 
@@ -14516,7 +14516,7 @@ function renderLine(){
       const box=document.getElementById("qr-"+c.id);
       if(box.innerHTML){ box.innerHTML=""; return; }
       lineCode(c); await save();
-      try{ await relayGet("putcode",`&c=${c.id}&code=${c.linkcode}&name=${encodeURIComponent(c.name)}`); }
+      try{ await relayGet("putcode",`&cid=${c.id}&code=${c.linkcode}&name=${encodeURIComponent(c.name)}`); }
       catch(e){ toast("中継役に登録できませんでした："+e.message); }
       const q=qrcode(0,"M"); q.addData(lineUrl(c)); q.make();
       box.innerHTML=`<div class="qr">${q.createSvgTag(5,8)}</div>
