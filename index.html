@@ -546,6 +546,46 @@
   .navcard .nc-v .warn{color:var(--alert)}
   .navcard .nc-a{flex:none;color:var(--ink3);font-size:17px}
 
+  /* ---- 画面デザインの見本（v234。カルテッツの designID 4つと同じ並び） ---- */
+  .dzgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:12px}
+  .dzcard{display:block;width:100%;text-align:left;cursor:pointer;padding:8px;
+          border:1px solid var(--line);border-radius:12px;background:var(--card)}
+  .dzcard.on{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent) inset}
+  .dzcv{width:100%;height:auto;display:block;border-radius:8px;background:var(--bg2)}
+  .dzname{display:flex;align-items:center;gap:7px;margin-top:8px;
+          font-size:13px;font-family:var(--jp);color:var(--ink)}
+  .dzradio{flex:none;width:14px;height:14px;border-radius:50%;border:1.5px solid var(--ink3);display:inline-block}
+  .dzcard.on .dzradio{border-color:var(--accent);background:
+    radial-gradient(circle at 50% 50%,var(--accent) 0 45%,transparent 46%)}
+
+  /* ---- LINE設定の14ステップ（v234。カルテッツの階段と同じ形） ---- */
+  .wz-head{display:flex;justify-content:space-between;align-items:flex-end;gap:12px;
+           flex-wrap:wrap;margin-bottom:12px}
+  .wz-sub{font-size:12px;color:var(--ink3);font-family:var(--jp);margin-top:2px}
+  .wz-prog{font-size:12px;color:var(--ink2);font-family:var(--jp);min-width:140px}
+  .wz-bar{height:6px;border-radius:3px;background:var(--line);margin-top:4px;overflow:hidden}
+  .wz-bar i{display:block;height:100%;background:var(--accent)}
+  .wz-wrap{display:flex;gap:14px;align-items:flex-start;flex-wrap:wrap}
+  .wz-list{flex:0 0 210px;min-width:180px;display:flex;flex-direction:column;gap:4px}
+  .wz-step{display:flex;align-items:center;gap:8px;width:100%;text-align:left;cursor:pointer;
+           padding:8px 10px;border:1px solid var(--line);border-radius:9px;background:var(--card);
+           font-size:12.5px;font-family:var(--jp);color:var(--ink2)}
+  .wz-step.on{border-color:var(--accent);background:var(--bg2);color:var(--ink);font-weight:600}
+  .wz-step i{flex:none;font-style:normal;font-size:10px;min-width:22px;text-align:center;
+             border-radius:4px;padding:1px 3px}
+  .wz-ok{background:var(--accent);color:#fff}
+  .wz-now{background:var(--ink);color:#fff}
+  .wz-no{color:var(--ink3)}
+  .wz-main{flex:1;min-width:260px}
+  .wz-tag{font-size:11px;color:var(--ink3);font-family:var(--jp)}
+  .wz-tag b{font-style:normal;border-radius:4px;padding:1px 6px;margin-left:6px;font-size:10px}
+  .wz-done{background:var(--accent);color:#fff}
+  .wz-doing{background:var(--ink);color:#fff}
+  .wz-t{margin:4px 0 8px;font-size:16px;font-family:var(--jp)}
+  .wz-d{margin:0 0 12px;padding-left:20px;font-size:12.5px;line-height:1.85;
+        color:var(--ink2);font-family:var(--jp)}
+  @media(max-width:560px){ .wz-list{flex:1 1 100%} }
+
   /* ---- お客様の照合（v99） ---- */
   .cslist{max-height:430px;overflow:auto;border:1px solid var(--line);
           border-radius:10px;background:var(--card);margin-top:12px}
@@ -934,7 +974,7 @@
 /* このファイルの版。ファイル名の番号（salon-de-kou-karte_NN.html）と必ずそろえること。
    仕分け待ちの下書きを捨てるかどうかの判定（BUYVER）にも使うので、
    ここを上げ忘れると、古い読み取りで作られた下書きが生き残る（v87でやらかした） */
-const APPVER=232;
+const APPVER=234;
 const KEY="sdk:data";
 /* ★ v133：QC／SEED／PROD／MENU／QK／CHARTS0／STOCK0／ACTUAL／VISITS は
    **わざと空にしてあります。書き戻さないこと。**
@@ -1517,6 +1557,9 @@ function normalizeDb(){
   if(!db.stock) db.stock={};
   if(!db.relay) db.relay={url:"",key:""};
   ensureLine();
+  ensureSettei();   /* v234：各種設定。★ 新しい db.◯◯ は必ずここに登録する
+                       （ensureSettei だけでは、その画面を開くまで通らない。
+                        クラウドから受け取ったデータで落ちる道ができる） */
   if(!db.hpb) db.hpb={};
   /* v230：月が変わったら月初を自動で引き継ぐ。**ここに置くと、端末の写しから開いたときも、
      正本や他の端末から受け取ったときも、必ず通る**（normalizeDb は3つの入口ぜんぶが通る） */
@@ -11900,7 +11943,8 @@ let syncPage="menu";   // menu / square / cust / prod / mail / menus / data / se
    月を変えられないまま入力することになっていた（v190のおぼえがきに調べた結果） */
 /* v206：`square`（Squareの決済を取り込む）は v190 から入口が無く、
    中の `s-orders` はもともと作られてもいなかったので外した（renderSync のおぼえがき参照） */
-const SYNCTITLE={data:"データの持ち出し・移行",prod:"商品の照合（Squareのカタログ）",
+const SYNCTITLE={settei:"各種設定",   /* v234：カルテッツと同じ7グループ22項目の一枚 */
+                 data:"データの持ち出し・移行",prod:"商品の照合（Squareのカタログ）",
                  cust:"お客様の照合",mail:"ホットペッパーの予約メール",setup:"連携設定",
                  menus:"メニューの一覧",   /* v166：在庫タブから移した（在庫の概念が無いため） */
                  req:"川口さんの改善要望"};   /* REQTEMP v204：試作のあいだだけ */
@@ -11934,6 +11978,10 @@ function syncMenuHtml(){
       締めの①②③④と同じ場所で、月も前月・次月で選べます。
       <button class="nav" id="sy-acct" style="margin-left:6px">会計をひらく</button></p>
     <div class="navlist">
+      ${/* v234：カルテッツの「各種設定」と同じ並び・同じ名前で1枚にまとめた入口 */""}
+      ${card("settei","設","各種設定",
+        "カルテッツの各種設定と同じ並び（店舗情報・LINE設定・カルテ設定…）",
+        "22項目","川口さんに見てもらう画面です")}
       ${card("menus","メ","メニューの一覧",
         "カルテと予約の入力候補になります。料金と所要時間もここで直します",
         `${MENUS().length}件`,"在庫の概念が無いので在庫タブから移しました")}
@@ -12297,6 +12345,321 @@ function renderHpb(){
   };
 }
 
+/* ==================== 各種設定（v234・2026-09-14） ====================
+   ★★ カルテッツの「各種設定」は **7グループ22項目の一枚**だった
+     （2026-09-14 に実物を見て、入力欄の name まで写した。写しは
+      `カルテッツ実物_各種設定_2026-09-14.md`）。
+     うちはこれまで、設定が LINEタブ・連携タブ・会計タブに散らばっていて、
+     **「各種設定」という入口そのものが無かった**。ここで1枚にまとめる。
+
+   考えかた：
+     ・**カルテッツと同じ名前・同じ並び**にする（川口さんが見比べられるように）。
+     ・すでにアプリにあるものは **その画面へ飛ぶだけ**（二重に持たない）。
+     ・無かったものは **ここで持つ**（db.settei）。
+     ・うちに概念が無いものは **隠さずに並べて、「うちではこうします」と書く**。
+       ★ 消してしまうと、川口さんが「あれが無い」と気づけない。並べて○×を付けてもらう。
+
+   ★ 初期値はカルテッツの実物の値を入れてある。**1端末につき1回だけ**入れる（db.setver）。
+     セグメント（segver）・クーポン（cpver）・リッチメニュー（rmver）と同じ形。
+     ★★ 毎回入れてはいけない。人が消した値をそのつど勝手に戻してしまう。 */
+const SET0={
+  /* 店舗管理 */
+  shop:{name:"Salon de KOU（サロンドコウ）", zip:"503-0983", pref:"岐阜県",
+        addr1:"大垣市静里町１１７１－１", addr2:"川瀬ビル1F", tel:"090-7611-6638",
+        open:"平　日　9:30〜16:00\n火・木　9:30〜19:00", holiday:"月曜日定休日",
+        instagram:"", homepage:"", mapLink:""},
+  tax:{rate:10, rounding:"切り捨て"},
+  hours:[{on:true,st:"10:00",et:"17:00"},{on:true,st:"09:00",et:"15:00"},
+         {on:true,st:"09:00",et:"15:00"},{on:true,st:"09:00",et:"15:00"},
+         {on:true,st:"09:00",et:"15:00"},{on:true,st:"09:00",et:"15:00"},
+         {on:true,st:"09:00",et:"15:00"}],
+  terms:"", privacy:"",
+  /* カレンダー管理 */
+  calView:"month",
+  /* 会員管理 */
+  point:{on:false, startMonth:9},
+  custReq:{addr:{req:true,ui:true}, email:{req:true,ui:true}, tel:{req:true,ui:true}},
+  tags:["紹介"],
+  /* POS機能設定 */
+  pays:["現金","カード","paypay","スマート払い"],
+  /* カルテ設定 */
+  ehr:{fields:["施術内容","次回気をつける事 確認する事","メモ","",""]},
+  /* 予約システム設定 */
+  resv:{on:false, title:"Web予約", desc:""}
+};
+const SETWEEK=["日","月","火","水","木","金","土"];
+function ensureSettei(){
+  const s=Object.assign({},SET0,db.settei||{});
+  s.shop   =Object.assign({},SET0.shop,   s.shop||{});
+  s.tax    =Object.assign({},SET0.tax,    s.tax||{});
+  s.point  =Object.assign({},SET0.point,  s.point||{});
+  s.resv   =Object.assign({},SET0.resv,   s.resv||{});
+  s.ehr    =Object.assign({},SET0.ehr,    s.ehr||{});
+  if(!Array.isArray(s.ehr.fields)||s.ehr.fields.length!==5) s.ehr.fields=SET0.ehr.fields.slice();
+  s.custReq=Object.assign({},SET0.custReq,s.custReq||{});
+  ["addr","email","tel"].forEach(k=>{
+    s.custReq[k]=Object.assign({},SET0.custReq[k],s.custReq[k]||{});
+  });
+  if(!Array.isArray(s.hours)||s.hours.length!==7) s.hours=SET0.hours.map(x=>Object.assign({},x));
+  s.hours=s.hours.map(x=>Object.assign({on:true,st:"09:00",et:"18:00"},x||{}));
+  if(!Array.isArray(s.tags)) s.tags=SET0.tags.slice();
+  if(!Array.isArray(s.pays)) s.pays=SET0.pays.slice();
+  if(!["month","week","day"].includes(s.calView)) s.calView="month";
+  db.settei=s;
+  if(db.setver!==1) db.setver=1;   /* いまは印だけ。中身は上の既定で埋まる */
+  return s;
+}
+/* カルテッツの各種設定の並び。
+   go: アプリの中の行き先（あるものだけ）／edit: この画面で直せるもの */
+function setteiGroups(){
+  const s=ensureSettei();
+  const yn=v=>v?"はい":"いいえ";
+  return [
+    {g:"店舗管理", rows:[
+      {n:"店舗情報", edit:"shop", v:esc(s.shop.name||"未設定"),
+       sub:"お客様ページ（店舗情報）とリッチメニューの行き先で使います"},
+      {n:"消費税率設定", edit:"tax", v:`${s.tax.rate}％・${esc(s.tax.rounding)}`,
+       sub:"★ うちの金額はSquareの税込を写しているので、いまは覚え書きです"},
+      {n:"営業時間休業日設定", edit:"hours",
+       v:`${s.hours.filter(x=>x.on).length}日ひらく`,
+       sub:"スケジュールの目安。★ 予約を止める仕組みはまだありません"},
+      {n:"利用規約", edit:"terms", v:s.terms?`${s.terms.length}字`:"未設定",
+       sub:"カルテッツは空でした。お客様ページに出すときに使います"},
+      {n:"プライバシーポリシー", edit:"privacy", v:s.privacy?`${s.privacy.length}字`:"未設定",
+       sub:"★ 本番の公式アカウントへ移すときに要ります（LINEの審査）"}
+    ]},
+    {g:"カレンダー管理", rows:[
+      {n:"カレンダー設定", edit:"cal",
+       v:{month:"月次カレンダー",week:"週間カレンダー",day:"日別カレンダー"}[s.calView],
+       sub:"スケジュールを開いたときの、はじめの見え方"}
+    ]},
+    {g:"会員管理", rows:[
+      {n:"ポイント機能と会員ランク設定", edit:"point", v:s.point.on?"使う":"使わない",
+       sub:"★ カルテッツの実物も<b>OFF</b>でした。ランクはv71で消してあります"},
+      {n:"お客様情報の必須項目設定", edit:"custreq",
+       v:`必須 ${["addr","email","tel"].filter(k=>s.custReq[k].req).length}／3`,
+       sub:"お客様ページ（マイページ）で、どの欄を出すか・必ず入れてもらうか"},
+      {n:"お客様タグ", edit:"tags", v:`${s.tags.length}件`,
+       sub:"名簿のタグ欄と、顧客セグメントの「お客様タグ」で使います"},
+      {n:"顧客セグメント", go:"seg", v:`${(db.segs||[]).length}件`,
+       sub:"フォローUPの対象。カルテッツと同じ場所（会員管理）に入口を置きました"}
+    ]},
+    {g:"POS機能設定", rows:[
+      {n:"商品一覧", tab:"stock", v:`${(db.products||[]).length}件`,
+       sub:"うちは「在庫」タブです（Squareのカタログから取り込みます）"},
+      {n:"カテゴリ一覧", tab:"stock", v:"在庫タブ",
+       sub:"うちはSquareのカテゴリをそのまま使っています"},
+      {n:"メーカー一覧", v:"—", sub:"★ うちにはありません。仕入先は「会計 → 仕入れ」で見ます"},
+      {n:"値引一覧", v:"—", sub:"★ うちにはありません。値引きはSquare側で入ります"},
+      {n:"支払方法", edit:"pays", v:`${s.pays.length}件`,
+       sub:"現金出納帳と会計で使う区分。カルテッツの実物と同じ4つを入れてあります"}
+    ]},
+    {g:"LINE設定", line:true, rows:[
+      {n:"予約リマインド通知", go:"remind", v:`${db.line.reminds.filter(r=>r.on).length}本`,
+       sub:"ご来店の何日前に、どんな文面でお知らせするか"},
+      {n:"フォローUPメッセージ", go:"follow", v:`${db.line.follows.filter(f=>f.on).length}本`,
+       sub:"だれに・いつ・どの文面を送るか（カルテッツと同じ5つのタイミング）"},
+      {n:"画面デザイン", go:"tone", v:esc((RMSKIN[db.line.tone]||RMSKIN.luxury).n),
+       sub:"リッチメニューの絵柄を4つから選ぶ（カルテッツと同じ）"},
+      {n:"次回予約表示", go:"next",
+       v:{normal:"通常の表示方法",hide:"表示しない",guide:"案内文を表示する"}[db.line.nextMode],
+       sub:"次回のご予約が無い方に、どう出すか"},
+      {n:"LINE設定", go:"conn",
+       v:`${LWIZ.filter((x,i)=>lwizOk(i)).length} / ${LWIZ.length} 完了`,
+       sub:"14ステップの接続手順（カルテッツと同じ段取り）"},
+      {n:"リッチメニュー（うち独自）", go:"rich",
+       v:rmCheck().length?"未設定":"出せます",
+       sub:"★ カルテッツでは管理画面から作れませんでした。うちは自分で作って出せます"},
+      {n:"クーポン", go:"coupon", v:`${(db.coupons||[]).length}件`,
+       sub:"カルテッツでは左メニューの「クーポン管理」にありました"}
+    ]},
+    {g:"カルテ設定", rows:[
+      {n:"カルテ設定", edit:"ehr",
+       v:`${s.ehr.fields.filter(Boolean).length}欄`,
+       sub:"カルテの入力欄の名前。★ 実物は「施術内容／次回気をつける事 確認する事／メモ」の3つでした"},
+      {n:"カスタムカルテ用紙", v:"—",
+       sub:"★ うちにはありません（手書きの図に書き込む用紙。カルテには写真を貼れます）"}
+    ]},
+    {g:"予約システム設定", rows:[
+      {n:"予約システム設定", edit:"resv", v:s.resv.on?"使う":"使わない",
+       sub:"★ うちのご予約はホットペッパーです。カルテッツの実物も予約設定は<b>0件</b>でした"}
+    ]}
+  ];
+}
+let setteiOpen="";   /* いま開いている項目（edit のキー）。1つだけ開く */
+function setteiEditHtml(k){
+  const s=ensureSettei();
+  const t=(id,v,ph,w)=>`<input class="f-in" id="${id}" value="${esc(v==null?"":v)}" placeholder="${esc(ph||"")}"${w?` style="max-width:${w}"`:""}>`;
+  if(k==="shop") return `
+    <label class="f" for="se-name">店舗名</label>${t("se-name",s.shop.name)}
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px">
+      <label class="f" style="flex:0 0 130px">郵便番号${t("se-zip",s.shop.zip,"503-0983")}</label>
+      <label class="f" style="flex:0 0 130px">都道府県${t("se-pref",s.shop.pref,"岐阜県")}</label>
+      <label class="f" style="flex:1;min-width:200px">住所${t("se-a1",s.shop.addr1)}</label>
+      <label class="f" style="flex:1;min-width:160px">建物名${t("se-a2",s.shop.addr2)}</label>
+    </div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px">
+      <label class="f" style="flex:1;min-width:170px">電話番号${t("se-tel",s.shop.tel)}</label>
+      <label class="f" style="flex:1;min-width:220px">Instagram${t("se-ig",s.shop.instagram,"https://…")}</label>
+      <label class="f" style="flex:1;min-width:220px">ホームページ${t("se-hp",s.shop.homepage,"https://…")}</label>
+    </div>
+    <label class="f" for="se-open" style="margin-top:10px">営業時間（文章）</label>
+    <textarea class="f-in" id="se-open" style="min-height:64px">${esc(s.shop.open||"")}</textarea>
+    <label class="f" for="se-hol" style="margin-top:10px">定休日</label>${t("se-hol",s.shop.holiday)}
+    <label class="f" for="se-map" style="margin-top:10px">地図のURL</label>${t("se-map",s.shop.mapLink,"https://www.google.com/maps/…")}
+    <p class="note">★ お客様ページ（<code>kou-salon.html</code>）には、いまこの内容が<b>焼き込んであります</b>。
+      ここを直しても自動では反映されません。直したら教えてください（1か所書きかえます）。</p>`;
+  if(k==="tax") return `
+    <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end">
+      <label class="f" style="flex:0 0 120px">消費税率（％）
+        <input class="f-in" id="se-rate" type="number" min="0" max="30" value="${+s.tax.rate}"></label>
+      <label class="f" style="flex:0 0 160px">端数の処理
+        <select class="f-in" id="se-round">
+          ${["切り捨て","切り上げ","四捨五入"].map(x=>`<option${s.tax.rounding===x?" selected":""}>${x}</option>`).join("")}
+        </select></label>
+    </div>
+    <p class="note">★ うちの金額は<b>Squareの税込</b>をそのまま写しているので、いまは覚え書きです。
+      手入力のカルテで税を計算するようになったら、ここを見るようにします。</p>`;
+  if(k==="hours") return `
+    <div class="plist" style="gap:0">
+      ${s.hours.map((h,i)=>`<div class="pc"><div class="ph-row" style="cursor:default">
+        <div class="pn"><b>${SETWEEK[i]}曜日</b></div>
+        <label class="note" style="margin:0"><input type="checkbox" id="se-h${i}" ${h.on?"checked":""}> ひらく</label>
+        <input class="f-in" id="se-hs${i}" type="time" value="${esc(h.st)}" style="width:110px">
+        <span class="note" style="margin:0">〜</span>
+        <input class="f-in" id="se-he${i}" type="time" value="${esc(h.et)}" style="width:110px">
+      </div></div>`).join("")}
+    </div>
+    <p class="note">★ いまは<b>目安として持っているだけ</b>です。営業時間の外に予約を入れても止めません。
+      止めてほしいかどうかを川口さんに聞きたいところです。</p>`;
+  if(k==="terms"||k==="privacy") return `
+    <textarea class="f-in" id="se-txt" style="min-height:180px">${esc(s[k]||"")}</textarea>
+    <p class="note">${k==="privacy"
+      ?"★ <b>本番の公式アカウントへ移すときに要ります</b>（LINEのログインチャネルで公開URLを求められます）。"
+      :"カルテッツの実物は空でした。"}</p>`;
+  if(k==="cal") return `
+    <div class="filt" style="margin:0">
+      ${[["month","月次カレンダー"],["week","週間カレンダー"],["day","日別カレンダー"]]
+        .map(([v,l])=>`<button class="chip${s.calView===v?" on":""}" data-secal="${v}">${l}</button>`).join("")}
+    </div>
+    <p class="note">スケジュールを開いたときの、はじめの見え方です。</p>`;
+  if(k==="point") return `
+    <label class="note" style="margin:0"><input type="checkbox" id="se-pt" ${s.point.on?"checked":""}> ポイント機能を使う</label>
+    <p class="note">★ <b>カルテッツの実物も OFF</b> でした（264名だれもポイントを持っていません）。
+      会員ランク（ブロンズ〜ブラック）も v71 で画面から消してあります。<br>
+      使うことになったら、顧客セグメントの「会員ステータス」「保有ポイント」も一緒に作ります。</p>`;
+  if(k==="custreq"){
+    const row=(kk,n)=>`<div class="pc"><div class="ph-row" style="cursor:default">
+        <div class="pn"><b>${n}</b></div>
+        <label class="note" style="margin:0"><input type="checkbox" id="se-r-${kk}" ${s.custReq[kk].req?"checked":""}> 必須</label>
+        <label class="note" style="margin:0"><input type="checkbox" id="se-u-${kk}" ${s.custReq[kk].ui?"checked":""}> 表示する</label>
+      </div></div>`;
+    return `<div class="plist" style="gap:0">
+        ${row("addr","住所")}${row("email","メールアドレス")}${row("tel","電話番号")}
+      </div>
+      <p class="note">カルテッツの実物は<b>6つぜんぶON</b>でした。<br>
+        ★ ここは<b>お客様ページ（マイページ）の入力欄</b>の話です。
+        「表示しない」にした欄は、お客様に見せません。<br>
+        ★ <b>メールアドレスはアプリのどこにも出していません</b>（引き継ぎ その20 の警告）。
+        使わないなら「表示する」を外すと、お客様の手間が減ります。</p>`;
+  }
+  if(k==="tags") return `
+    <label class="f" for="se-tags">お客様タグ（1行に1つ）</label>
+    <textarea class="f-in" id="se-tags" style="min-height:90px">${esc(s.tags.join("\n"))}</textarea>
+    <p class="note">カルテッツの実物は「<b>紹介</b>」の1件だけでした。
+      ここに並べたものが、顧客セグメントの「お客様タグ」の候補になります。</p>`;
+  if(k==="pays") return `
+    <label class="f" for="se-pays">支払方法（1行に1つ・上から順に出ます）</label>
+    <textarea class="f-in" id="se-pays" style="min-height:90px">${esc(s.pays.join("\n"))}</textarea>
+    <p class="note">カルテッツの実物は<b>現金／カード／paypay／スマート払い</b>の4つでした。</p>`;
+  if(k==="ehr") return `
+    ${s.ehr.fields.map((f,i)=>`<label class="f" for="se-f${i}" style="margin-top:${i?10:0}px">第${i+1}入力フォーム名
+      <input class="f-in" id="se-f${i}" value="${esc(f)}" placeholder="空欄にすると出しません"></label>`).join("")}
+    <p class="note">カルテッツの実物は<b>3つ</b>（施術内容／次回気をつける事 確認する事／メモ）でした。<br>
+      ★ うちのカルテの欄は<b>いまのところ名前が決まっています</b>。ここは<b>控えです</b>。
+      川口さんが「この名前に変えたい」と言ったら、カルテ側を合わせます。</p>`;
+  if(k==="resv") return `
+    <label class="note" style="margin:0"><input type="checkbox" id="se-rv" ${s.resv.on?"checked":""}> オンライン予約を使う</label>
+    <label class="f" for="se-rvt" style="margin-top:10px">ページタイトル</label>${t("se-rvt",s.resv.title,"Web予約")}
+    <label class="f" for="se-rvd" style="margin-top:10px">説明</label>
+    <textarea class="f-in" id="se-rvd" style="min-height:70px">${esc(s.resv.desc||"")}</textarea>
+    <p class="note">★ うちのご予約は<b>ホットペッパー</b>です（リッチメニューの「ご予約」もそこへ行きます）。
+      カルテッツの実物も、予約設定は<b>0件</b>で使われていませんでした。</p>`;
+  return "";
+}
+function setteiHtml(){
+  ensureLine(); ensureSettei();
+  const gs=setteiGroups();
+  const row=r=>{
+    const id=r.edit||"";
+    const act=r.edit?`<button class="btn ghost" data-seopen="${id}">${setteiOpen===id?"とじる":"ひらく"}</button>`
+      :(r.go?`<button class="btn ghost" data-sego="${r.go}">ひらく</button>`
+      :(r.tab?`<button class="btn ghost" data-setab="${r.tab}">ひらく</button>`:""));
+    return `<div class="pc"><div class="ph-row" style="cursor:default">
+        <div class="pn"><b>${esc(r.n)}</b><span class="sub">${r.sub||""}</span></div>
+        <span class="note" style="margin:0;white-space:nowrap">${r.v||""}</span>${act}
+      </div>${r.edit&&setteiOpen===r.edit
+        ?`<div class="sheet" style="margin:0 0 10px">${setteiEditHtml(r.edit)}
+            <div class="actions"><button class="btn" id="se-save">保存する</button>
+              <button class="btn quiet" data-seopen="${id}">とじる</button></div>
+            <p class="note" id="se-msg"></p></div>`:""}
+    </div>`;
+  };
+  return `<p class="note" style="margin:0 0 12px">カルテッツの「各種設定」と<b>同じ並び・同じ名前</b>にしてあります
+      （2026-09-14 に実物を写しました）。<br>
+      すでにアプリにあるものは「ひらく」でその画面へ飛びます。<b>「—」は、うちに無いもの</b>です。
+      <b>要る／要らないを教えてください。</b></p>
+    ${gs.map(g=>`<div class="sheet">
+        <label class="f">${esc(g.g)}</label>
+        <div class="plist" style="gap:0">${g.rows.map(row).join("")}</div>
+      </div>`).join("")}
+    <p class="note">いま開いているのは <b>v${APPVER}</b> です。</p>`;
+}
+function renderSettei(){
+  const el=document.getElementById("setteihost");
+  if(!el) return;
+  el.innerHTML=setteiHtml();
+  const s=ensureSettei();
+  const msg=(t,ok)=>{const e=el.querySelector("#se-msg"); if(e){e.textContent=t; e.style.color=ok?"var(--accent)":"var(--alert)";}};
+  const g=id=>{const e=el.querySelector("#"+id); return e?e.value.trim():"";};
+  const ck=id=>{const e=el.querySelector("#"+id); return !!(e&&e.checked);};
+
+  el.querySelectorAll("[data-seopen]").forEach(b=>b.onclick=()=>{
+    setteiOpen=(setteiOpen===b.dataset.seopen)?"":b.dataset.seopen; renderSettei();
+  });
+  el.querySelectorAll("[data-sego]").forEach(b=>b.onclick=()=>{
+    linePage=b.dataset.sego; lineTab="set"; lineEdit=null; segEdit=null; cpEdit=null; fuTim=null;
+    setTab("line");
+  });
+  el.querySelectorAll("[data-setab]").forEach(b=>b.onclick=()=>setTab(b.dataset.setab));
+  el.querySelectorAll("[data-secal]").forEach(b=>b.onclick=async()=>{
+    s.calView=b.dataset.secal; await save(); renderSettei(); toast("保存しました");
+  });
+
+  const sv=el.querySelector("#se-save");
+  if(sv) sv.onclick=async()=>{
+    const k=setteiOpen;
+    if(k==="shop") Object.assign(s.shop,{name:g("se-name"),zip:g("se-zip"),pref:g("se-pref"),
+      addr1:g("se-a1"),addr2:g("se-a2"),tel:g("se-tel"),instagram:g("se-ig"),
+      homepage:g("se-hp"),holiday:g("se-hol"),mapLink:g("se-map"),
+      open:(el.querySelector("#se-open")||{value:""}).value});
+    else if(k==="tax"){ s.tax.rate=+g("se-rate")||0; s.tax.rounding=g("se-round"); }
+    else if(k==="hours") s.hours=s.hours.map((h,i)=>({on:ck("se-h"+i),st:g("se-hs"+i)||"09:00",et:g("se-he"+i)||"18:00"}));
+    else if(k==="terms"||k==="privacy") s[k]=(el.querySelector("#se-txt")||{value:""}).value;
+    else if(k==="point") s.point.on=ck("se-pt");
+    else if(k==="custreq") ["addr","email","tel"].forEach(x=>{
+      s.custReq[x]={req:ck("se-r-"+x),ui:ck("se-u-"+x)}; });
+    else if(k==="tags") s.tags=(el.querySelector("#se-tags")||{value:""}).value
+      .split(/\r?\n/).map(x=>x.trim()).filter(Boolean);
+    else if(k==="pays") s.pays=(el.querySelector("#se-pays")||{value:""}).value
+      .split(/\r?\n/).map(x=>x.trim()).filter(Boolean);
+    else if(k==="ehr") s.ehr.fields=[0,1,2,3,4].map(i=>g("se-f"+i));
+    else if(k==="resv"){ s.resv.on=ck("se-rv"); s.resv.title=g("se-rvt");
+      s.resv.desc=(el.querySelector("#se-rvd")||{value:""}).value; }
+    await save(); msg("保存しました",true); renderSettei();
+  };
+}
+
 function renderSync(){
   const el=document.getElementById("sync");
   const s=db.relay||{url:"",key:""};
@@ -12321,6 +12684,7 @@ function renderSync(){
     </div>`;
 
   const body={
+    settei:`<div id="setteihost"></div>`,   /* v234 */
     cust:`<div id="custhost"></div>`,
     menus:`<div id="menuhost"></div>`,   /* v166 */
     data:`<div class="sheet">
@@ -12393,6 +12757,7 @@ function renderSync(){
   el.innerHTML=head+body;
   document.getElementById("sp-back").onclick=()=>setSyncPage("menu");
 
+  if(syncPage==="settei"){ renderSettei(); return; }            /* v234 */
   if(syncPage==="cust"){ renderCustSync(); return; }
   if(syncPage==="menus"){ stHost="menuhost"; stQ=""; renderMenu(); return; }   /* v166 */
   if(syncPage==="prod"){ renderProdSync(); return; }
@@ -12672,6 +13037,33 @@ function segMatch(c,cr){
   if(cr.next==="1"&&!nextApptOf(c.id,today())) return false;
   if(cr.next==="0"&&nextApptOf(c.id,today())) return false;
   if(cr.pace==="1"&&!(p&&(p.lv==="risk"||p.lv==="soon"))) return false;
+  /* ── v234：カルテッツの実物にあった条件を足した（2026-09-14） ── */
+  /* ★ 性別は、お客様がマイページで入れてくださった c.sex を見る。
+     中継役が「女性／男性／その他」の3つに寄せて名簿に書く（square-relay_25.gs の mePutOne_）。
+     まだ入っていない方が大半なので、"未設定"（none）も選べるようにしてある */
+  if(cr.sex){
+    const sx=c.sex||"";
+    if(cr.sex==="none"){ if(sx) return false; }
+    else if(sx!==cr.sex) return false;
+  }
+  /* ★ クーポンの3条件は db.cpgive（v222の配布記録）で本当に見られる。
+     カルテッツ側も「使ったかどうかは人が押して記録する」形だった */
+  if(cr.cpHold==="1"||cr.cpHold==="0"){
+    const held=cpHeld(c.id).length>0;
+    if(cr.cpHold==="1"&&!held) return false;
+    if(cr.cpHold==="0"&&held) return false;
+  }
+  if(cr.cpUsed==="1"||cr.cpUsed==="0"){
+    cpGiveInit();
+    const used=db.cpgive.some(g=>g.cid===c.id&&(g.used||[]).length);
+    if(cr.cpUsed==="1"&&!used) return false;
+    if(cr.cpUsed==="0"&&used) return false;
+  }
+  if(has(cr.cpDays)){
+    cpGiveInit();
+    const lim=shiftDay(today(),-Math.abs(+cr.cpDays));
+    if(!db.cpgive.some(g=>g.cid===c.id&&String(g.at||"").slice(0,10)>=lim)) return false;
+  }
   return true;
 }
 function segById(id){ return (db.segs||[]).find(s=>s.id===id)||null; }
@@ -12694,6 +13086,39 @@ const CPSEED=[
    kind:"バースデイ",open:true,endType:"bd",days:0,endDate:"",times:1}
 ];
 const CPEND={days:"配信日から◯日まで",date:"日付で指定",bd:"誕生月の1日から月末",unlimited:"無期限"};
+/* ★★ v234：カルテッツの実物のクーポン編集画面（/control/coupons/edit/…）に合わせて欄を増やした。
+   ★★ **向きが逆だったことが分かった。**（2026-09-14）
+     実物の「フォローUP編集」には**クーポンの欄が無い**。一覧に出る「クーポン設定中」は、
+     **クーポン側が対象セグメントと配信タイミングとLINE通知文を持っていて**、
+     そこからフォローUPに結びついていた。うちは逆（フォローUPにクーポンを付ける）だった。
+   → **両方できるようにした。** フォローUP側の `coupon` は今までどおり残してある
+     （消すと、いま入っているフォローUPのクーポンが全部はずれる）。 */
+const CPGOAL={saikuru:"再来促進",tanka:"単価UP",royal:"ロイヤル化"};
+/* 重複配布の動作。★ 実物の3つと同じ意味・同じ順番にしてある */
+const CPREDIST={
+  none:{n:"重複配布しない（1人1回限り）",
+        d:"すでにこのクーポンを発行した方には再配布しません。"},
+  pattern_a:{n:"未使用は期限延長／使用済は未使用で再発行",
+        d:"未使用のクーポンがあれば利用期限を延ばし、使用済なら未使用のものに置きかえて再発行します。利用期限が「無期限」かつ未使用の場合は再配布しません。"},
+  pattern_a_skip_unused:{n:"未使用はスキップ／使用済のみ未使用で再発行",
+        d:"未使用のクーポンがある方には再配布しません。使用済の場合だけ、未使用のものに置きかえて再発行します。"}
+};
+/* 欠けている欄を埋める。★ すでに db.coupons を持っている端末のため（cpver は1のまま進まない）。
+   ★ **値は上書きしない。** 無いものだけ足す */
+function cpNorm(cp){
+  const o=Object.assign({},cp);
+  if(typeof o.serial!=="string") o.serial="";
+  if(!CPGOAL[o.goal]) o.goal=(o.kind==="バースデイ")?"royal":(o.kind==="全体配信"?"tanka":"saikuru");
+  if(typeof o.pubStart!=="string") o.pubStart="";
+  if(typeof o.pubEnd!=="string")   o.pubEnd="";
+  if(!CPREDIST[o.redist]) o.redist="none";
+  if(typeof o.segId!=="string") o.segId="";
+  if(!o.tim||typeof o.tim!=="object") o.tim={t:"once",date:"",at:"10:00"};
+  if(typeof o.noteTitle!=="string") o.noteTitle="";
+  if(typeof o.noteText!=="string")  o.noteText="";
+  if(typeof o.noteImg!=="string")   o.noteImg="";
+  return o;
+}
 function cpById(id){ return (db.coupons||[]).find(x=>x.id===id)||null; }
 function cpLimitText(cp){
   if(cp.endType==="days") return `配信日から${cp.days}日まで（きょう出すなら〜${shiftDay(today(),+cp.days||0).replace(/-/g,"/")}）`;
@@ -12734,17 +13159,71 @@ function cpEndDate(cp,at){
   }
   return "";                                    /* 無期限 */
 }
+/* ★★ v234：**重複配布の動作**（カルテッツの実物の3通り）をほんとうに効かせる。
+   戻り値は {g, how}。how は "new"（新しく配った）／"extend"（期限を延ばした）／
+   "reissue"（使用済を未使用で出し直した）／"skip"（配らなかった）。
+   ★ **何もしなかったときも null ではなく how:"skip" を返す。**
+     null だと呼ぶ側が「失敗」と「配らない決まり」を区別できない。 */
+/* ★ 「どうするか」だけを決める。**何も書かない。**
+   送る前に「だれに届くか」を数えたいので、決める側と書く側を分けてある
+   （書いてから送ると、送信に失敗したときに配ったことだけが残る）。 */
+function cpDecide(cpId,cid){
+  cpGiveInit();
+  const cp=cpById(cpId); if(!cp||!cid) return {how:"skip",g:null};
+  const mine=db.cpgive.filter(x=>x.cid===cid&&x.cp===cpId);
+  const times=Math.max(1,+cp.times||1);
+  const unused=mine.filter(x=>(x.used||[]).length<times);
+  const mode=CPREDIST[cp.redist]?cp.redist:"none";
+  if(!mine.length) return {how:"new",g:null};
+  if(mode==="none") return {how:"skip",g:null};
+  if(mode==="pattern_a"){
+    if(unused.length){
+      /* 無期限（end が空）のものは延ばしようが無いので、そのまま */
+      const u=unused[unused.length-1];
+      return u.end?{how:"extend",g:u}:{how:"skip",g:u};
+    }
+    return {how:"reissue",g:null};   /* ぜんぶ使いきっている → 出し直す */
+  }
+  if(mode==="pattern_a_skip_unused"){
+    if(unused.length) return {how:"skip",g:unused[unused.length-1]};
+    return {how:"reissue",g:null};
+  }
+  return {how:"skip",g:null};
+}
 function cpGive(cpId,cid){
   cpGiveInit();
   const cp=cpById(cpId); if(!cp||!cid) return null;
   const at=today();
+  const d=cpDecide(cpId,cid);
+  if(d.how==="skip")   return {g:d.g,how:"skip"};
+  if(d.how==="extend"){ d.g.end=cpEndDate(cp,at); d.g.at=at; return {g:d.g,how:"extend"}; }
   const g={id:"g"+Date.now().toString(36)+Math.floor(Math.random()*1000),
            cp:cpId, cid:cid, at:at, end:cpEndDate(cp,at), used:[]};
   db.cpgive.push(g);
   /* 保存容量のために古いぶんから落とす（端末の localStorage は5MBしかない） */
   if(db.cpgive.length>5000) db.cpgive=db.cpgive.slice(-5000);
-  return g;
+  return {g:g,how:d.how};
 }
+/* 送る文面。★ 通知タイトル・本文が空なら、クーポン名と概要で組み立てる */
+function cpNoteText(cp,c){
+  if(!cp) return "";
+  const nm=c&&c.name?`${c.name}様`:"";
+  return [nm, esc0(cp.noteTitle)||cp.name, esc0(cp.noteText), couponBlock(cp.id),
+          nextBlock(c&&c.id,today()), signLine()].filter(Boolean).join("\n\n");
+}
+function esc0(v){ return String(v||"").trim(); }
+/* きょう、このクーポンを配る相手。
+   ★ **カルテッツと違って自動では配らない。** 画面に人数を出して、押したぶんだけ配る */
+function cpTargets(cp){
+  if(!cp||!cp.open) return [];
+  if(!inTerm({start:cp.pubStart,end:cp.pubEnd},today())) return [];
+  const seg=cp.segId?segById(cp.segId):null;
+  return db.customers.filter(c=>c.lineId&&!c.lineBlocked)
+    .filter(c=>!seg||segMatch(c,seg.cr));
+}
+/* きょうが配信日か（フォローUPとまったく同じ決めかた） */
+function cpDue(cp,ds){ const d=ds||today();
+  return !!cp&&!!cp.open&&inTerm({start:cp.pubStart,end:cp.pubEnd},d)&&followDue({tim:cp.tim},d); }
 /* その方がいま使えるクーポン。期限切れと使いきりを外す */
 function cpHeld(cid,on){
   cpGiveInit(); const t=on||today();
@@ -12881,10 +13360,21 @@ function ensureLine(){
      ★ 毎回入れてはいけない。ensureLine は renderLine のたびに通るので、
        人が消した値をそのつど勝手に戻してしまう。
        db.rmver で1回に限る（セグメント segver ・クーポン cpver と同じ考え方） */
-  if(db.rmver!==224){
+  /* ★★ v234：印を 224 → 234 に進めて、**もう一度だけ**入れ直す。
+     2026-09-14 に利用者の実データ（公開版・v232）を見たら、
+     **db.rmver は 224 なのに rm.base も rm.book も空**だった。
+     db.line の中身が oaId 以外すべて LINE0 の既定に戻っていたので、原因は
+     **LINEタブ「連携する」の保存ボタン**（`db.line={oaId:…}` とまるごと置きかえていた）。
+     いちど消えると、v224 の「1回だけ」の印が邪魔をして**二度と戻らない**ため、
+     リッチメニューが永久に出せない状態になっていた。
+     ★ 上の置きかえは v234 で直したので、これは**取り残された端末の後始末**。
+     ★ 空のときだけ入れる。人が入れた値は今までどおり触らない。
+     ★ わざと空にしていた人には1回だけ戻ってしまうが、
+       「出せないまま気づけない」ほうが害が大きいと判断した。 */
+  if(db.rmver!==234){
     if(!String(s.rm.base||"").trim()) s.rm.base=RM_BASE0;
     if(!String(s.rm.book||"").trim()) s.rm.book=RM_BOOK0;
-    db.rmver=224;
+    db.rmver=234;
   }
   db.line=s;
   if(!db.linesent||typeof db.linesent!=="object") db.linesent={};
@@ -12903,6 +13393,8 @@ function ensureLine(){
       db.coupons.push(Object.assign({},x)); });
     db.cpver=1;
   }
+  /* v234：欄が増えたので、足りないところだけ埋める。**中身は上書きしない** */
+  db.coupons=db.coupons.map(cpNorm);
   return s;
 }
 let lineTab="link", lineSel=new Set(), lineText="", linePage="menu", lineEdit=null;
@@ -13153,7 +13645,7 @@ async function lineSend(cids,text,img){
    各ページの上に日本語で書いてある。 */
 const LSTITLE={remind:"予約リマインド通知",follow:"フォローUPメッセージ",
   seg:"顧客セグメント",coupon:"クーポン",
-  tone:"画面デザイン（文面の調子）",next:"次回予約表示",conn:"LINEとつなぐ設定",
+  tone:"画面デザイン",next:"次回予約表示",conn:"LINE設定",
   rich:"リッチメニュー"};
 let segEdit=null, cpEdit=null, fuTim=null;
 
@@ -13179,15 +13671,17 @@ function lineSetMenuHtml(){
       ${card("follow","追","フォローUPメッセージ",
         "だれに・いつ・どの文面を送るか（カルテッツと同じ5つのタイミング）",
         onF?`${onF}本`:"なし",todayF?`今日の対象 ${todayF}名`:"今日は対象なし",!onF)}
-      ${card("tone","調","画面デザイン",
-        "カルテッツはLINEの中の画面の見た目。うちは文面の調子に読みかえ",
-        toneOf().n,signLine()||"署名なし")}
+      ${card("tone","絵","画面デザイン",
+        "リッチメニューの絵柄を4つから選ぶ（カルテッツと同じ）",
+        (RMSKIN[db.line.tone]||RMSKIN.luxury).n,
+        db.line.richOn!==false?"カルテッツのメニューは有効":"カルテッツのメニューは無効")}
       ${card("next","次","次回予約表示",
         "次回のご予約が無い方に、どう出すか",
         {normal:"通常の表示方法",hide:"表示しない",guide:"案内文を表示する"}[s.nextMode],"")}
-      ${card("conn","繋","LINE設定（つなぐ）",
-        "公式アカウントID・中継役・接続の確認",
-        conn?"設定ずみ":"未設定","",!conn)}
+      ${card("conn","繋","LINE設定",
+        "14ステップの接続手順（カルテッツと同じ段取り）",
+        `${LWIZ.filter((x,i)=>lwizOk(i)).length} / ${LWIZ.length} 完了`,
+        conn?"公式アカウントIDと中継役は設定ずみ":"中継役が未設定",!conn)}
       ${card("rich","絵","リッチメニュー",
         "トークの下に出るメニュー。カルテッツの「画面デザイン」の正体がこれでした",
         rmOk?"出せます":"未設定",
@@ -13459,6 +13953,14 @@ function segFormHtml(){
     <div class="plist" style="gap:0">
       <div class="pc"><div class="ph-row" style="cursor:default"><div class="pn"><b>LINE連携状態</b></div>
         ${sel3("sg-line",cr.line,"連携済み","未連携")}</div></div>
+      <div class="pc"><div class="ph-row" style="cursor:default"><div class="pn"><b>性別</b><span class="sub">マイページで入れていただいたぶん（${db.customers.filter(c=>c.sex).length}名）</span></div>
+        <select class="f-in" id="sg-sex" style="width:auto">
+          <option value=""${!cr.sex?" selected":""}>指定なし</option>
+          <option value="男性"${cr.sex==="男性"?" selected":""}>男性</option>
+          <option value="女性"${cr.sex==="女性"?" selected":""}>女性</option>
+          <option value="その他"${cr.sex==="その他"?" selected":""}>その他</option>
+          <option value="none"${cr.sex==="none"?" selected":""}>未設定</option>
+        </select></div></div>
       <div class="pc"><div class="ph-row" style="cursor:default"><div class="pn"><b>年齢</b><span class="sub">生年月日から数えます</span></div>
         ${num("sg-afrom",cr.afrom,"歳以上")}<span class="note" style="margin:0">〜</span>${num("sg-ato",cr.ato,"歳以下")}</div></div>
       <div class="pc"><div class="ph-row" style="cursor:default"><div class="pn"><b>誕生月</b></div>
@@ -13479,12 +13981,19 @@ function segFormHtml(){
         ${num("sg-yfrom",cr.yfrom,"円以上")}<span class="note" style="margin:0">〜</span>${num("sg-yto",cr.yto,"円以下")}</div></div>
       <div class="pc"><div class="ph-row" style="cursor:default"><div class="pn"><b>次回予約</b></div>
         ${sel3("sg-next",cr.next,"あり","なし")}</div></div>
+      <div class="pc"><div class="ph-row" style="cursor:default"><div class="pn"><b>有効クーポン保有</b><span class="sub">配った記録（v222）から。期限内で、まだ使い切っていないもの</span></div>
+        ${sel3("sg-cphold",cr.cpHold,"あり","なし")}</div></div>
+      <div class="pc"><div class="ph-row" style="cursor:default"><div class="pn"><b>クーポン使用経験</b><span class="sub">「使った」を押して記録したぶん</span></div>
+        ${sel3("sg-cpused",cr.cpUsed,"あり","なし")}</div></div>
+      <div class="pc"><div class="ph-row" style="cursor:default"><div class="pn"><b>クーポン受取（過去◯日以内）</b></div>
+        <span class="note" style="margin:0">過去</span>${num("sg-cpdays",cr.cpDays,"日")}<span class="note" style="margin:0">日以内に受取済み</span></div></div>
       <div class="pc"><div class="ph-row" style="cursor:default"><div class="pn"><b>失客まえ（うち独自）</b><span class="sub">来店の間隔から見て、そろそろの方</span></div>
         <label class="note" style="margin:0"><input type="checkbox" id="sg-pace"${cr.pace==="1"?" checked":""}> 失客まえの方だけ</label></div></div>
     </div>
-    <p class="note">カルテッツにあって<b>ここに無い条件</b>：性別／会員ステータス（ブロンズ〜ブラック）／
-      保有ポイント／有効クーポン保有／クーポン使用経験／クーポン受取。
-      うちの名簿にその欄が無いためです。</p>
+    <p class="note">カルテッツの16条件のうち、<b>ここに無いのは2つだけ</b>になりました（v234）：
+      <b>会員ステータス（ブロンズ〜ブラック）</b>と<b>保有ポイント</b>。名簿にその欄がありません。
+      ★ カルテッツの実物でも<b>ポイント機能はOFF</b>で、13件のセグメントは<b>ぜんぶ未計算・未使用</b>でした。<br>
+      性別は、お客様がマイページで入れてくださったぶんだけ分かります（いま ${db.customers.filter(c=>c.sex).length}名）。</p>
     <div class="actions">
       <button class="btn" id="sg-save">保存する</button>
       <button class="btn ghost" id="sg-count">件数を確認する</button>
@@ -13516,17 +14025,30 @@ function lineSegPageHtml(){
 }
 
 /* ---------- クーポン ---------- */
+/* v234：カルテッツの実物（/control/coupons/edit/…）と同じ欄立てにした。
+   ★ 「配信タイミング」はフォローUPとまったく同じ5種なので、`fuTimHtml()` をそのまま使う
+     （実物も同じ画面部品だった）。クーポンの画面とフォローUPの画面は
+     **同時に出ない**ので、id が `fu-…` のままでもぶつからない。 */
 function cpFormHtml(){
   const cp=cpEdit==="new"
-    ?{id:"",name:"",body:"",kind:"再来フォローアップ",open:true,endType:"days",days:30,endDate:"",times:1}
+    ?cpNorm({id:"",name:"",body:"",kind:"再来フォローアップ",open:true,
+             endType:"days",days:30,endDate:"",times:1})
     :(db.coupons||[]).find(x=>x.id===cpEdit);
   if(!cp) return "";
   return `<div class="sheet" id="ls-form">
     <label class="f" for="cp-name">クーポン名</label>
     <input class="f-in" id="cp-name" value="${esc(cp.name||"")}" style="max-width:420px">
-    <label class="f" for="cp-body" style="margin-top:10px">クーポンの内容</label>
-    <textarea class="f-in" id="cp-body" style="min-height:90px">${esc(cp.body||"")}</textarea>
-    <label class="f" for="cp-kind" style="margin-top:10px">区分</label>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px">
+      <label class="f" style="flex:1;min-width:190px">クーポン番号（半角英数20字以内）
+        <input class="f-in" id="cp-serial" maxlength="20" value="${esc(cp.serial||"")}" placeholder="空欄でもかまいません"></label>
+      <label class="f" style="flex:0 0 170px">目的
+        <select class="f-in" id="cp-goal">
+          ${Object.entries(CPGOAL).map(([k,v])=>`<option value="${k}"${cp.goal===k?" selected":""}>${v}</option>`).join("")}
+        </select></label>
+    </div>
+    <label class="f" for="cp-body" style="margin-top:10px">クーポン概要（500文字以内）</label>
+    <textarea class="f-in" id="cp-body" maxlength="500" style="min-height:90px">${esc(cp.body||"")}</textarea>
+    <label class="f" for="cp-kind" style="margin-top:10px">配信区分</label>
     <select class="f-in" id="cp-kind" style="width:auto">
       ${["再来フォローアップ","全体配信","バースデイ"].map(k=>
         `<option value="${k}"${cp.kind===k?" selected":""}>${k}</option>`).join("")}
@@ -13540,12 +14062,49 @@ function cpFormHtml(){
       <span class="note" style="margin:0">日</span>
       <input class="f-in" id="cp-enddate" type="date" value="${esc(cp.endDate||"")}" style="width:170px">
     </div>
-    <label class="f">利用回数と公開</label>
+    <label class="f">利用可能回数と登録ステータス</label>
     <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:12px">
-      <input class="f-in" id="cp-times" type="number" min="1" max="9" value="${+cp.times||1}" style="width:90px">
-      <span class="note" style="margin:0">回利用可</span>
-      <label class="note" style="margin:0 0 0 10px"><input type="checkbox" id="cp-open"${cp.open?" checked":""}> 公開</label>
+      <input class="f-in" id="cp-times" type="number" min="1" max="999" value="${+cp.times||1}" style="width:90px">
+      <span class="note" style="margin:0">回利用可（1〜999）</span>
+      <label class="note" style="margin:0 0 0 10px"><input type="checkbox" id="cp-open"${cp.open?" checked":""}> 公開（外すと下書き・非公開）</label>
     </div>
+
+    <label class="f">設定の有効期間</label>
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:12px">
+      <input class="f-in" id="cp-pubstart" type="date" value="${esc(cp.pubStart||"")}" style="width:170px">
+      <span class="note" style="margin:0">〜</span>
+      <input class="f-in" id="cp-pubend" type="date" value="${esc(cp.pubEnd||"")}" style="width:170px">
+      <span class="note" style="margin:0">終了は空欄＝期限なし</span>
+    </div>
+
+    <label class="f">重複配布の動作</label>
+    <p class="note" style="margin:0 0 6px">すでに同じクーポンを受け取っている方への扱いです。</p>
+    <div class="plist" style="gap:0;margin-bottom:12px">
+      ${Object.entries(CPREDIST).map(([k,v])=>`
+        <div class="pc"><label class="ph-row" style="cursor:pointer">
+          <input type="radio" name="cp-redist" value="${k}"${(cp.redist||"none")===k?" checked":""}>
+          <div class="pn"><b>${esc(v.n)}</b><span class="sub">${esc(v.d)}</span></div>
+        </label></div>`).join("")}
+    </div>
+
+    <label class="f">クーポン配信設定</label>
+    <p class="note" style="margin:0 0 6px">★ カルテッツはここで決めた時刻に<b>自動で配ります</b>が、
+      うちは<b>押したぶんだけ</b>配ります（下の一覧に「きょうの対象 ◯名」と出ます）。</p>
+    <label class="f" for="cp-seg">対象顧客セグメント</label>
+    <select class="f-in" id="cp-seg" style="max-width:420px">
+      <option value=""${!cp.segId?" selected":""}>絞り込みなし（LINE連携ずみの全員）</option>
+      ${(db.segs||[]).map(s=>`<option value="${esc(s.id)}"${cp.segId===s.id?" selected":""}>${esc(s.name)}</option>`).join("")}
+    </select>
+    <div style="margin-top:12px">${fuTimHtml({tim:cp.tim})}</div>
+
+    <label class="f">LINE通知の設定</label>
+    <label class="f" for="cp-notetitle" style="font-weight:400">通知メッセージタイトル（30文字以内）</label>
+    <input class="f-in" id="cp-notetitle" maxlength="30" value="${esc(cp.noteTitle||"")}" placeholder="${esc(cp.name||"クーポンが届きました")}" style="max-width:420px">
+    <label class="f" for="cp-notetext" style="font-weight:400;margin-top:10px">メッセージ（1500文字以内）</label>
+    <textarea class="f-in" id="cp-notetext" maxlength="1500" style="min-height:90px">${esc(cp.noteText||"")}</textarea>
+    <label class="f" for="cp-noteimg" style="font-weight:400;margin-top:10px">通知タイトル画像（URL）</label>
+    <input class="f-in" id="cp-noteimg" value="${esc(cp.noteImg||"")}" placeholder="https://…（jpg／png）">
+
     <div class="actions">
       <button class="btn" id="cp-save">保存する</button>
       <button class="btn quiet" id="cp-cancel">やめる</button>
@@ -13556,11 +14115,24 @@ function lineCouponPageHtml(){
   const rows=(db.coupons||[]).map(cp=>`
     <div class="pc"><div class="ph-row" style="cursor:default">
       <span class="pi ph" style="background:var(--line,#8fb9a8)">券</span>
-      <div class="pn"><b>${esc(cp.name)}　<em style="font-style:normal;color:${cp.open?"var(--accent)":"var(--ink3)"}">${cp.open?"公開":"非公開"}</em></b>
-        <span class="sub">${esc(cp.kind||"")}　／　${esc(cpLimitText(cp))}　／　${+cp.times||1}回利用可</span></div>
+      <div class="pn"><b>${esc(CPGOAL[cp.goal]||"")}　${esc(cp.name)}　<em style="font-style:normal;color:${cp.open?"var(--accent)":"var(--ink3)"}">${cp.open?"公開":"非公開"}</em></b>
+        <span class="sub">${esc(cp.kind||"")}　／　${esc(cpLimitText(cp))}　／　${+cp.times||1}回利用可
+          ${cp.serial?`　／　番号 ${esc(cp.serial)}`:""}</span>
+        <span class="sub">対象：${esc(cp.segId?(segNameOf(cp.segId)||"（消えたセグメント）"):"絞り込みなし")}
+          　／　${esc(timText({tim:cp.tim}))}</span></div>
       <button class="btn ghost qrbtn" data-cpedit="${cp.id}">編集</button>
       <button class="btn quiet qrbtn" data-cpdel="${cp.id}">削除</button>
     </div>
+    ${(()=>{ /* v234：きょうの配布。★ 自動では配らない。押したぶんだけ */
+      const due=cpDue(cp), tg=cpTargets(cp);
+      const give=tg.filter(c=>cpDecide(cp.id,c.id).how!=="skip");
+      if(!cp.open) return `<p class="note" style="margin:0 14px 12px">非公開なので配れません。</p>`;
+      return `<div style="margin:0 14px 12px">
+        <p class="note" style="margin:0 0 6px">きょうの対象 <b>${tg.length}名</b>
+          ／ 重複配布の決まりで実際に配るのは <b>${give.length}名</b>
+          ${due?"":"　<b class=\"warn\">（きょうは配信日ではありません）</b>"}</p>
+        <button class="btn quiet" data-cpsend="${cp.id}"${give.length?"":" disabled"}>この ${give.length}名に配る（LINEで送ります）</button>
+      </div>`; })()}
     <div class="preview" style="margin:0 14px 14px">${esc(couponBlock(cp.id))}</div>
     </div>`).join("");
   return `<div class="sheet">
@@ -13578,38 +14150,51 @@ function lineCouponPageHtml(){
     ${cpGiveHtml()}`;
 }
 
-/* ---------- 画面デザイン（文面の調子） ---------- */
+/* ---------- 画面デザイン（v234：カルテッツの実物どおり「絵柄4種」に戻した） ----------
+   実物：designID radio 4つ（1 ビューティー／2 ラグジュアリー／3 スタイリッシュ／4 ポップ）。
+   　　　＋2枚目のカード「カルテッツリッチメニューの有効／無効」（useRichmenu・実物はON）。
+   ★ 見本の絵は本番と同じ rmDraw() で描く。見本と本番が違う絵だと、選んだものと出るものが
+     食い違って、押すまで気づけない。 */
 function lineTonePageHtml(){
   const s=db.line;
   const sample=db.customers.find(c=>c.name)||{name:"山田花子",id:""};
   const a={date:shiftDay(today(),1),start:"10:00",menu:"全身脱毛",staff:"川口香子",cid:sample.id,id:"__x"};
   const r=(s.reminds.find(x=>x.on)||s.reminds[0]||{days:1,top:"",bot:""});
+  const card=([k,v])=>`
+    <button class="dzcard${s.tone===k?" on":""}" data-tone="${k}">
+      <canvas id="dz-${k}" class="dzcv"></canvas>
+      <span class="dzname"><i class="dzradio"></i>${esc(v.n)}</span>
+    </button>`;
   return `<div class="sheet">
-      <p class="note" style="margin:0 0 12px">カルテッツの「画面デザイン」は、お客様が開くLINEの中の画面（リッチメニュー・マイページ）の見た目でした。
-        4つから選ぶ形で、<b>実物は「ラグジュアリー」が選ばれています</b>（2026-09-08 に確認）。<br>
-        うちにその画面は無いので、<b>送る文面の調子</b>——締めの言い方と署名——に読み替えています。</p>
-      <label class="f">調子</label>
-      <div class="filt" style="margin:0 0 14px">
-        ${Object.entries(TONES).map(([k,v])=>
-          `<button class="chip${s.tone===k?" on":""}" data-tone="${k}">${v.n}<em>${v.emo||"—"}</em></button>`).join("")}
-      </div>
+      <p class="note" style="margin:0 0 12px">カルテッツのこのページは、<b>リッチメニューの絵柄を4つから選ぶ</b>ものでした
+        （実物は<b>ラグジュアリー</b>。2026-09-14 に入力欄の name まで確認）。同じ4つを用意しています。<br>
+        ★ 絵はこの画面で描いています。<b>カルテッツの画像は使っていません。</b>
+        選ぶと、<b>「リッチメニュー」のページで作る絵</b>がそのまま変わります。</p>
+      <label class="f">画面デザイン</label>
+      <div class="dzgrid">${Object.entries(RMSKIN).map(card).join("")}</div>
+      <p class="note" id="l-msg"></p>
+    </div>
+
+    <div class="sheet">
+      <label class="f">カルテッツリッチメニュー</label>
+      <p class="note" style="margin:0 0 8px">カルテッツの同じページにある「カルテッツリッチメニューの有効／無効」です（実物は<b>有効</b>）。
+        <b>いまLINEに出ているメニューはカルテッツ製</b>で、うちのアプリからは切り替えられません。
+        ここは覚え書きです。うちの絵に差し替えるのは「リッチメニュー」のページから行います。</p>
+      <label class="note" style="margin:0"><input type="checkbox" id="lt-rich"${s.richOn!==false?" checked":""}> いまカルテッツのリッチメニューは有効</label>
+    </div>
+
+    <div class="sheet">
+      <label class="f">文面の調子（うち独自）</label>
+      <p class="note" style="margin:0 0 8px">選んだ絵柄に合わせて、<b>送る文の締めの言い方</b>も変わります
+        （カルテッツには無い項目です）。締めの言い方：<b>${esc(toneOf().foot)}</b></p>
       <label class="f" for="lt-sign">署名（文末に入る店名）</label>
       <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
         <input class="f-in" id="lt-sign" value="${esc(s.sign||"")}" style="max-width:260px">
         <label class="note" style="margin:0"><input type="checkbox" id="lt-signon"${s.signOn!==false?" checked":""}> 署名を入れる</label>
         <button class="btn quiet" id="lt-save">保存</button>
       </div>
-      <p class="note">締めの言い方：<b>${esc(toneOf().foot)}</b>（追加する通知の「下の文」の初期値になります）</p>
-      <p class="note" id="l-msg"></p>
     </div>
-    <div class="sheet">
-      <label class="f">カルテッツリッチメニュー</label>
-      <p class="note" style="margin:0 0 8px">カルテッツの同じページには「カルテッツリッチメニューの有効／無効」がありました（実物は<b>有効</b>）。
-        リッチメニューはLINE側に置くものなので、<b>うちのアプリからは切り替えられません</b>。
-        いまのリッチメニューはカルテッツ製で、6つのボタンのうち施術記録・マイページ・会員証は
-        カルテッツのお客様向けページに行きます。ここは覚え書きとして持っているだけです。</p>
-      <label class="note" style="margin:0"><input type="checkbox" id="lt-rich"${s.richOn!==false?" checked":""}> いまカルテッツのリッチメニューは有効</label>
-    </div>
+
     <div class="sheet">
       <label class="f">通知のプレビュー</label>
       <div class="preview">${esc(remindText(r,sample,a))}</div>
@@ -13645,54 +14230,238 @@ function lineNextPageHtml(){
     </div>`;
 }
 
-/* ---------- LINEとつなぐ設定 ---------- */
+/* ==================== LINE設定＝14ステップのウィザード（v234） ====================
+   ★★ カルテッツの「各種設定 → LINE設定」は、**14段の階段**だった
+     （2026-09-14 に実物を見て、step_key と入力欄の name まで写した。実物は 2／14 完了）。
+     左に14段、右にスクリーンショットと手順、下に入力欄と「次へ／保存して次へ」。
+     段の印は ▶（作業中）／□（未完了）／OK（完了）の3つ。
+
+   ★ うちに合わせて変えたところ（実物と意味がちがう段は、画面にそう書いてある）：
+     ・**シークレットとアクセストークンはアプリに保存しない。**
+       中継役（Apps Script）のスクリプトプロパティに入れる。
+       うちの db.json は Googleドライブに置いてあり、控えも日ごとに残るので、
+       そこに合言葉を入れると**消したつもりでも控えに残る**。IDだけを控える。
+     ・**STEP3・6 の Webhook は「まだ入れない」が正解。**
+       1チャネル1Webhookなので、入れた瞬間にカルテッツのLINE連携が止まる。
+     ・STEP10・13（Emailの利用申請とスコープ）は**うちでは使わない**。印だけ付けられる。
+
+   ★ db.line.wiz に控える：{step, done:{}, msgId, loginId, liffId}
+     done は step_key → true。実物と同じキー名にしてある（あとで見比べられるように）。 */
+const LWIZ=[
+  {k:"official_account", n:"公式アカウント", need:"oa",
+   d:["LINE公式アカウントを作ったら、ホーム画面に出ているIDを確かめます。",
+      "「@」から始まるIDがベーシックIDです。",
+      "下の欄に入れて保存してください（@は付けても付けなくてもかまいません）。"]},
+  {k:"messaging_api_started", n:"Messaging APIを有効にする", need:"ask",
+   d:["LINE公式アカウント管理画面を開きます。",
+      "設定 → Messaging API をクリックします。",
+      "「Messaging APIを利用する」をクリックします。",
+      "プロバイダー作成画面が出たら、店舗名を入れます。",
+      "プライバシーポリシーと利用規約は、URLが無ければ空欄のまま「OK」で構いません。"],
+   q:"Messaging API を有効にしましたか？"},
+  {k:"messaging_api_info", n:"Messaging API情報の登録", need:"msgid",
+   d:["Channel ID の［コピー］を押して、下の欄に貼ります。",
+      "Channel secret は**アプリには入れません**。中継役のスクリプトプロパティに入れてください。",
+      "Webhook URL は下からコピーできますが、**いまは LINE に入れないでください**。"]},
+  {k:"provider_opened", n:"LINE Developers画面を開く", need:"ask",
+   d:["LINE Developers を開きます。",
+      "プロバイダー一覧から店舗名を探して、クリックします。",
+      "★「新規チャネル作成」は押さないでください（すでにあるものを開きます）。"],
+   q:"プロバイダーを開きましたか？"},
+  {k:"messaging_channel_opened", n:"APIチャネル", need:"ask",
+   d:["すでに作られている Messaging API チャネルを開きます。"],
+   q:"Messaging API チャネルを開きましたか？"},
+  {k:"access_token", n:"アクセストークン", need:"token",
+   d:["画面上部の「Messaging API設定」をクリックします。",
+      "★「Webhookの利用」は**まだONにしないでください**（カルテッツが使っています）。",
+      "いちばん下の「チャネルアクセストークン（長期）」の「発行」を押します。",
+      "出てきた文字列をコピーして、**中継役のスクリプトプロパティ LINE_TOKEN** に貼ります。",
+      "貼ったら下の「つながるか試す」を押してください。"]},
+  {k:"line_login_created", n:"LINEログイン", need:"ask",
+   d:["LINE Developers の「コンソール（ホーム）」をクリックします。",
+      "店舗名のプロバイダーを開きます。",
+      "「新規チャネル作成」→「LINEログイン」をクリックします。",
+      "チャネル名に店舗名を入れて作ります。"],
+   q:"LINEログインのチャネルを作りましたか？"},
+  {k:"login_info", n:"ログイン情報", need:"loginid",
+   d:["作ったLINEログインチャネルの Channel ID をコピーして、下の欄に貼ります。",
+      "Channel secret は**アプリには入れません**。"]},
+  {k:"official_account_linked", n:"LINE公式アカウントの紐付け", need:"ask",
+   d:["LINEログインチャネルの「LINEミニアプリ」または「リンクされたLINE公式アカウント」で、",
+      "さきほどの公式アカウントを選びます。"],
+   q:"公式アカウントと紐付けましたか？"},
+  {k:"email_permission_request", n:"Email利用申請", need:"skip",
+   d:["カルテッツはお客様のメールアドレスを受け取るために申請していました。",
+      "★ うちは**メールアドレスを使いません**（アプリのどこにも出しません）。",
+      "この段は飛ばしてかまいません。"],
+   q:"この段は飛ばします（印だけ付けます）"},
+  {k:"callback_and_publish", n:"コールバックURLを設定", need:"cb",
+   d:["LINEログインチャネルの「LINEログイン設定」を開きます。",
+      "コールバックURLに、下のURL（お客様ページの置き場所）を貼ります。",
+      "チャネルを「公開」にします。"]},
+  {k:"liff_created", n:"LIFF作成", need:"liff",
+   d:["LINEログインチャネルの「LIFF」タブ →「追加」を押します。",
+      "サイズは Full、エンドポイントURLは下のお客様ページのURLにします。",
+      "スコープは profile と openid にチェックを入れます。",
+      "できた LIFF ID を下の欄に貼ってください。",
+      "★ この値を kou-mypage_2.html の1行目 LIFF_ID に貼ると、お客様ページが動きます。"]},
+  {k:"email_scope", n:"Emailスコープ", need:"skip",
+   d:["LIFFのスコープに email を足す段です。",
+      "★ うちは使わないので飛ばします。"],
+   q:"この段は飛ばします（印だけ付けます）"},
+  {k:"complete", n:"完了", need:"done",
+   d:["ここまでの印がそろっているかを確かめます。"]}
+];
+function lwiz(){
+  const s=db.line;
+  if(!s.wiz||typeof s.wiz!=="object") s.wiz={};
+  const w=s.wiz;
+  if(!w.done||typeof w.done!=="object") w.done={};
+  if(typeof w.step!=="number"||w.step<1||w.step>LWIZ.length) w.step=1;
+  ["msgId","loginId","liffId"].forEach(k=>{ if(typeof w[k]!=="string") w[k]=""; });
+  return w;
+}
+/* その段が「済んでいる」か。**印を押したか**だけでなく、
+   入力が要る段は中身が入っているかも見る（押しただけで進めない） */
+function lwizOk(i){
+  const s=db.line, w=lwiz(), st=LWIZ[i], rl=db.relay||{};
+  if(st.need==="oa")      return !!String(s.oaId||"").trim();
+  if(st.need==="msgid")   return !!w.msgId;
+  if(st.need==="loginid") return !!w.loginId;
+  if(st.need==="liff")    return !!w.liffId;
+  if(st.need==="cb")      return !!String((s.rm&&s.rm.base)||"").trim();
+  if(st.need==="token")   return !!w.done[st.k];
+  if(st.need==="done")    return LWIZ.slice(0,LWIZ.length-1).every((x,j)=>lwizOk(j));
+  return !!w.done[st.k];
+}
 function lineConnPageHtml(){
-  const s=db.line, rl=db.relay||{url:"",key:""};
-  const row=(ok,t,sub)=>`<div class="pc"><div class="ph-row" style="cursor:default">
-      <span class="pi ph" style="background:${ok?"var(--accent)":"var(--ink3)"}">${ok?"✓":"—"}</span>
-      <div class="pn"><b>${t}</b><span class="sub">${sub}</span></div>
-    </div></div>`;
-  return `<div class="sheet">
-      <p class="note" style="margin:0 0 12px">カルテッツは14ステップの手順書でした（2026-09-08 時点で<b>2／14 完了</b>の表示。
-        STEP1 公式アカウントIDの登録・STEP6 Webhookとアクセストークン…と続きます）。
-        うちはトークンを<b>中継役（Apps Script）のスクリプトプロパティ LINE_TOKEN</b> に置くので、
-        アプリ側で持つのは公式アカウントのIDだけです。</p>
-      <label class="f" for="lc-oa">公式アカウントのID（@から始まるもの）</label>
+  const s=db.line, w=lwiz(), rl=db.relay||{url:"",key:""};
+  const n=LWIZ.length;
+  const okN=LWIZ.filter((x,i)=>lwizOk(i)).length;
+  const cur=Math.min(Math.max(w.step,1),n), st=LWIZ[cur-1];
+  const mark=i=>lwizOk(i)?'<i class="wz-ok">OK</i>':(i===cur-1?'<i class="wz-now">▶</i>':'<i class="wz-no">□</i>');
+  const steps=LWIZ.map((x,i)=>`
+    <button class="wz-step${i===cur-1?" on":""}" data-wstep="${i+1}">
+      ${mark(i)}<span>${esc(x.n)}</span></button>`).join("");
+  const relayExec=rl.url?String(rl.url):"";
+  const copyRow=(id,val,note)=>`
+    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:8px 0">
+      <input class="f-in" id="${id}" value="${esc(val)}" readonly style="flex:1;min-width:220px">
+      <button class="btn ghost" data-wcopy="${id}">コピー</button>
+    </div>${note?`<p class="note" style="margin:0">${note}</p>`:""}`;
+
+  let body="";
+  if(st.need==="oa"){
+    body=`<label class="f" for="lc-oa">LINE公式アカウントID</label>
       <div style="display:flex;gap:8px;flex-wrap:wrap">
-        <input class="f-in" id="lc-oa" value="${esc(s.oaId||"")}" placeholder="@072ckzvx" style="max-width:220px">
-        <button class="btn quiet" id="lc-save">保存</button>
-        <button class="btn ghost" id="lc-test">つながるか試す</button>
+        <input class="f-in" id="lc-oa" value="${esc(s.oaId||"")}" placeholder="@454llyli" style="max-width:220px">
+        <button class="btn quiet" id="lc-save">保存して次へ</button>
+      </div>`;
+  }else if(st.need==="msgid"){
+    body=`<label class="f" for="lc-msgid">Messaging API チャネルID</label>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <input class="f-in" id="lc-msgid" value="${esc(w.msgId)}" placeholder="2005806912" style="max-width:220px">
+        <button class="btn quiet" id="lc-msgsave">保存して次へ</button>
       </div>
-      <p class="note" id="l-msg"></p>
+      <label class="f" style="margin-top:14px">Webhook URL（うちの中継役）</label>
+      ${relayExec?copyRow("lc-hook",relayExec,
+        `★★ <b class="warn">いまは LINE に貼らないでください。</b>1つのチャネルに Webhook は1つだけで、
+         いまはカルテッツが使っています。貼り替えると<b>カルテッツのLINE連携（予約リマインドも）が止まります</b>。
+         貼り替えが要るのは「返信から紐づけ」と「QRでの登録」だけで、移行のいちばん最後です。`)
+        :`<p class="note">中継役のURLがまだ未設定です（連携タブ → 連携設定）。</p>`}`;
+  }else if(st.need==="token"){
+    body=`<p class="note" style="margin:0 0 10px">★ <b>アクセストークンはアプリに保存しません。</b>
+        中継役（Apps Script）の<b>スクリプト プロパティ <code>LINE_TOKEN</code></b> に入れてください。
+        うちの正本（db.json）はGoogleドライブに置いてあり、日ごとの控えも残るので、
+        合言葉を入れると<b>消したつもりでも控えに残ります</b>。</p>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button class="btn ghost" id="lc-test">つながるか試す</button>
+        <button class="btn quiet" id="lc-tokok">入れました（印を付けて次へ）</button>
+      </div>`;
+  }else if(st.need==="loginid"){
+    body=`<label class="f" for="lc-loginid">LINEログイン チャネルID</label>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <input class="f-in" id="lc-loginid" value="${esc(w.loginId)}" placeholder="2005806949" style="max-width:220px">
+        <button class="btn quiet" id="lc-loginsave">保存して次へ</button>
+      </div>`;
+  }else if(st.need==="cb"){
+    const base=String((s.rm&&s.rm.base)||"").replace(/\/+$/,"");
+    body=base?copyRow("lc-cb",base+"/kou-mypage_2.html",
+        "これをコールバックURL（とLIFFのエンドポイントURL）に貼ります。")
+      :`<p class="note">お客様ページの置き場所がまだ未入力です（<b>リッチメニュー</b>のページで入れてください）。</p>`;
+    body+=`<div class="actions"><button class="btn quiet" id="lc-cbok">貼りました（次へ）</button></div>`;
+  }else if(st.need==="liff"){
+    body=`<label class="f" for="lc-liff">LIFF ID</label>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <input class="f-in" id="lc-liff" value="${esc(w.liffId)}" placeholder="2005806949-xxxxxxxx" style="max-width:260px">
+        <button class="btn quiet" id="lc-liffsave">保存して次へ</button>
+      </div>
+      <p class="note">★ この値を <code>kou-mypage_2.html</code> の冒頭の <code>LIFF_ID</code> に貼ってから、
+        公開の場所へ置き直してください。</p>`;
+  }else if(st.need==="done"){
+    const ng=LWIZ.slice(0,n-1).map((x,i)=>lwizOk(i)?null:x.n).filter(Boolean);
+    body=ng.length
+      ?`<p class="note" style="border-left:3px solid var(--warn);padding-left:10px">
+          まだ済んでいない段：<b>${ng.map(esc).join("／")}</b></p>`
+      :`<p class="note">14段ぜんぶ済んでいます。</p>`;
+  }else{
+    body=`<p class="note" style="margin:0 0 10px">${esc(st.q||"この段は終わりましたか？")}</p>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button class="btn quiet" id="lc-yes">はい（次へ）</button>
+        <button class="btn ghost" id="lc-no">いいえ（まだ）</button>
+      </div>`;
+  }
+
+  return `<div class="sheet">
+      <div class="wz-head">
+        <div><b>LINE連携設定 ${cur} / ${n}</b>
+          <div class="wz-sub">手順に沿って順番に設定します</div></div>
+        <div class="wz-prog"><b>${okN} / ${n} 完了</b>
+          <div class="wz-bar"><i style="width:${Math.round(okN/n*100)}%"></i></div></div>
+      </div>
+      <div class="wz-wrap">
+        <div class="wz-list">${steps}</div>
+        <div class="wz-main">
+          <div class="wz-tag">STEP ${cur}　${lwizOk(cur-1)?'<b class="wz-done">完了</b>':'<b class="wz-doing">作業中</b>'}</div>
+          <h3 class="wz-t">${esc(st.n)}</h3>
+          <ol class="wz-d">${st.d.map(x=>`<li>${esc(x)}</li>`).join("")}</ol>
+          ${body}
+          <div class="actions">
+            <button class="btn ghost" id="lc-prev"${cur===1?" disabled":""}>← 前へ</button>
+            <button class="btn ghost" id="lc-next"${cur===n?" disabled":""}>次へ →</button>
+          </div>
+          <p class="note" id="l-msg"></p>
+        </div>
+      </div>
     </div>
-    <div class="plist">
-      ${row(!!s.oaId,"公式アカウントのID",s.oaId?esc(s.oaId):"未入力")}
-      ${row(!!(rl.url&&rl.key),"中継役のURLと合言葉",rl.url&&rl.key?"設定ずみ（連携タブ → 連携設定）":"未設定")}
-      ${row(!!db.customers.some(c=>c.lineId),"お客様との紐づけ",
-        `${db.customers.filter(c=>c.lineId).length}名／${db.customers.length}名`)}
+
+    <div class="sheet">
+      <label class="f">いまの状態</label>
+      <div class="plist">
+        ${[[!!s.oaId,"公式アカウントのID",s.oaId?esc(s.oaId):"未入力"],
+           [!!(rl.url&&rl.key),"中継役のURLと合言葉",rl.url&&rl.key?"設定ずみ（連携タブ → 連携設定）":"未設定"],
+           [!!w.liffId,"LIFF ID",w.liffId?esc(w.liffId):"未入力"],
+           [db.customers.some(c=>c.lineId),"お客様との紐づけ",
+            `${db.customers.filter(c=>c.lineId).length}名／${db.customers.length}名`]]
+          .map(([ok,t,sub])=>`<div class="pc"><div class="ph-row" style="cursor:default">
+            <span class="pi ph" style="background:${ok?"var(--accent)":"var(--ink3)"}">${ok?"✓":"—"}</span>
+            <div class="pn"><b>${t}</b><span class="sub">${sub}</span></div></div></div>`).join("")}
+      </div>
     </div>
-    <div class="sheet" style="margin-top:14px">
-      <label class="f">中継役でやっておくこと</label>
-      <p class="note">① LINE公式アカウントマネージャー → 設定 → Messaging API を有効にする<br>
-        ② LINE Developers のチャネル → Messaging API設定 で
-        <b>チャネルアクセストークン（長期）</b>を発行し、中継役の LINE_TOKEN に入れる<br>
-        ③ 応答メッセージを<b>オフ</b>にする（自動応答が返信の取り込みの邪魔をします）</p>
-      <label class="f" style="margin-top:10px">カルテッツと同居させるときの注意</label>
+
+    <div class="sheet">
+      <label class="f">カルテッツと同居させるときの注意</label>
       <p class="note"><b>Webhook URL は1つのチャネルに1つだけ</b>です。いまはカルテッツが使っています。
         中継役のURLに付け替えると<b>カルテッツのLINE連携が止まります</b>（予約リマインドも止まります）。<br>
-        送るだけ（このタブの「送る」・一斉送信・リマインド）は
+        送るだけ（一斉送信・リマインド・フォローUP・<b>リッチメニュー</b>）は
         トークンさえあれば<b>付け替えなくても動きます</b>。
         付け替えが要るのは「返信から紐づけ」「QRコードでの登録」だけです。移行の最後にしてください。</p>
-      <label class="f" style="margin-top:10px">v222 でできるようになったこと</label>
-      <p class="note">・<b>写真つきのLINE</b>… リマインドとフォローUPに画像を1枚付けられます（<b>中継役 v23</b> が要ります）<br>
-        ・<b>リッチメニューの差し替え</b>… 「リッチメニュー」のページで作って出せます。
-        <b>行き先をぜんぶURLにしてあるので、Webhookの付け替えは要りません</b><br>
-        ・<b>クーポンの配布・利用管理</b>… 「クーポン」のページの「配った記録」で見られます</p>
       <label class="f" style="margin-top:10px">いまもできないこと</label>
       <p class="note">・<b>お客様との紐づけ</b>… カルテッツから引き継げません。
-        リッチメニュー →マイページを開いてもらうと自動で結びつきます（Webhookは不要）。
+        リッチメニュー → マイページを開いてもらうと自動で結びつきます（Webhookは不要）。
         6桁コードで結ぶ道も残してあります<br>
-        ・<b>セグメントの4条件</b>（性別／会員ステータス／保有ポイント／クーポン関係）… 名簿にその欄がありません<br>
+        ・<b>セグメントの2条件</b>（会員ステータス／保有ポイント）… 名簿にその欄がありません。
+        ★ カルテッツの実物でも<b>ポイント機能はOFF</b>でした<br>
         ・<b>配信の自動化</b>… これは方針です。カルテッツは時刻が来ると勝手に送りますが、
         うちは<b>押したぶんだけ</b>送ります</p>
     </div>`;
@@ -13732,6 +14501,40 @@ const RMLAY={
     ]
   }
 };
+
+/* ==================== 画面デザイン＝絵柄4種（v234） ====================
+   ★★ カルテッツの「各種設定 → LINE設定 → 画面デザイン」は、**リッチメニューの絵柄を
+     4つから選ぶ画面**だった（designID 1〜4＝ビューティー／ラグジュアリー／スタイリッシュ／ポップ。
+     実物は **2＝ラグジュアリー**。2026-09-14 に入力欄の name まで確認）。
+   ★ うちは v216 でこれを「文面の調子」に読み替えていたが、**実物どおり絵柄に戻した**。
+     キーは今までと同じ（beauty／luxury／stylish／pop）なので、
+     **すでに選ばれている値・署名・締めの言い方はそのまま生きる**（TONES は消していない）。
+   ★ 絵はぜんぶ自分で描く。カルテッツの画像は持ってこない（人の作ったもの）。
+   ★ 色を足すときは bg を**5つ**（book／my／coupon／card／about の順）で書くこと。
+     足りないと RMLAY の bg に落ちる。 */
+const RMSKIN={
+  beauty:{  n:"ビューティー", page:"#FBF3F3", ink:"#7C4E52",
+            bg:["#F7E5E5","#F0D6D7","#FCF4F4","#F4DFE0","#EDD0D1"],
+            en:'"Georgia","Hiragino Mincho ProN",serif',
+            ja:'"Hiragino Sans","Yu Gothic",sans-serif',
+            line:"rgba(255,255,255,.92)", lw:6, sp:0 },
+  luxury:{  n:"ラグジュアリー", page:"#F6F3ED", ink:"#5C5045",
+            bg:["#EDE6DA","#DFD5C3","#F6F3ED","#EBE5DA","#DCD2C0"],
+            en:'"Times New Roman","Hiragino Mincho ProN",serif',
+            ja:'"Hiragino Sans","Yu Gothic",sans-serif',
+            line:"rgba(255,255,255,.9)", lw:6, sp:0.06 },
+  stylish:{ n:"スタイリッシュ", page:"#F1F1F0", ink:"#2E2E2C",
+            bg:["#E8E8E6","#DBDBD8","#F1F1F0","#E2E2DF","#D4D4D0"],
+            en:'"Helvetica Neue",Arial,"Hiragino Sans",sans-serif',
+            ja:'"Hiragino Sans","Yu Gothic",sans-serif',
+            line:"rgba(255,255,255,.96)", lw:4, sp:0.16 },
+  pop:{     n:"ポップ", page:"#FFF6E9", ink:"#B04A42",
+            bg:["#FFE4D3","#FFD3D0","#FFF4E3","#FFE8CA","#FFDAD3"],
+            en:'"Trebuchet MS","Hiragino Sans",sans-serif',
+            ja:'"Hiragino Sans","Yu Gothic",sans-serif',
+            line:"#FFFFFF", lw:12, sp:0, wEn:"bold", wJa:"bold" }
+};
+function skinOf(){ return RMSKIN[(db.line&&db.line.tone)]||RMSKIN.luxury; }
 
 /* 行き先。お客様ページの置き場所（公開URL）＋ページ名で組み立てる。
    ★ ご予約だけは外（ホットペッパー）なので、そのまま使う */
@@ -13826,30 +14629,47 @@ function rmIcon(g,kind,cx,cy,r){
 
 /* 2500×1686 に描く。**canvas の大きさは必ず実寸**にする
    （縮めて描いてから引き伸ばすと、LINEで見たときに文字がにじむ） */
-function rmDraw(cv){
+/* v234：絵柄（画面デザイン）で色と書体を変える。
+   ★ skinKey を渡すと、いま選んでいるものと関係なくその絵柄で描ける（見本用）。
+   ★ rm.ink は v233 まで使っていたが、絵柄が色を決めるようになったので**もう見ていない**
+     （データは消していない。戻したくなったときのため） */
+function rmDraw(cv,skinKey){
   const s=(db.line&&db.line.rm)||{};
   const lay=RMLAY[s.layout]||RMLAY.kou5;
+  const sk=RMSKIN[skinKey||(db.line&&db.line.tone)]||RMSKIN.luxury;
   const W=lay.size.w,H=lay.size.h;
   cv.width=W; cv.height=H;
   const g=cv.getContext("2d");
-  const ink=s.ink||"#5C5045";
-  g.fillStyle="#F6F3ED"; g.fillRect(0,0,W,H);
-  lay.cells.forEach(c=>{
-    g.fillStyle=c.bg; g.fillRect(c.x,c.y,c.w,c.h);
+  const ink=sk.ink;
+  g.fillStyle=sk.page; g.fillRect(0,0,W,H);
+  /* 字を並べる。canvas の letterSpacing は無い端末があるので、広げるときは1字ずつ置く */
+  const put=(t,cx,y,sp)=>{
+    const a=Array.from(String(t));
+    if(!sp||a.length<2){ g.textAlign="center"; g.fillText(t,cx,y); return; }
+    const gap=g.measureText("M").width*sp;
+    let w=gap*(a.length-1);
+    a.forEach(ch=>{ w+=g.measureText(ch).width; });
+    g.textAlign="left";
+    let x=cx-w/2;
+    a.forEach(ch=>{ g.fillText(ch,x,y); x+=g.measureText(ch).width+gap; });
+    g.textAlign="center";
+  };
+  lay.cells.forEach((c,i)=>{
+    g.fillStyle=(sk.bg&&sk.bg[i])||c.bg; g.fillRect(c.x,c.y,c.w,c.h);
     const cx=c.x+c.w/2, cy=c.y+c.h/2;
-    /* 行き先が空のマスは、うすく×を出して「まだ決まっていない」と分かるようにする */
+    /* 行き先が空のマスは、うすく出して「まだ決まっていない」と分かるようにする */
     const linked=!!rmLink(c.k);
     g.fillStyle=ink; g.globalAlpha=linked?1:0.32;
     rmIcon(g,c.ic,cx,cy-c.h*0.17,c.h*0.105);
     g.textAlign="center"; g.textBaseline="alphabetic";
-    g.font=`${Math.round(c.h*0.115)}px "Times New Roman", "Hiragino Mincho ProN", serif`;
-    g.fillText(c.en,cx,cy+c.h*0.115);
-    g.font=`${Math.round(c.h*0.062)}px "Hiragino Sans", "Yu Gothic", sans-serif`;
-    g.fillText(c.ja,cx,cy+c.h*0.225);
+    g.font=((sk.wEn?sk.wEn+" ":"")+Math.round(c.h*0.115)+"px "+sk.en);
+    put(c.en,cx,cy+c.h*0.115,sk.sp||0);
+    g.font=((sk.wJa?sk.wJa+" ":"")+Math.round(c.h*0.062)+"px "+sk.ja);
+    put(c.ja,cx,cy+c.h*0.225,sk.sp?sk.sp*0.6:0);
     g.globalAlpha=1;
   });
-  /* マスの境目。白い細線を重ねて、絵として1枚に見えるようにする */
-  g.strokeStyle="rgba(255,255,255,.9)"; g.lineWidth=6;
+  /* マスの境目。細線を重ねて、絵として1枚に見えるようにする */
+  g.strokeStyle=sk.line; g.lineWidth=sk.lw;
   lay.cells.forEach(c=>g.strokeRect(c.x,c.y,c.w,c.h));
   return cv;
 }
@@ -13928,7 +14748,30 @@ function lineRichPageHtml(){
     </div>`:""}
 
     <div class="sheet">
-      <label class="f">LINEに出す</label>
+      <label class="f">① まず、ひとりだけに出して確かめる（v234）</label>
+      <p class="note" style="margin:0 0 8px">★★ 下の「作ってLINEに出す」は<b>友だち全員に出ます</b>。
+        絵や行き先がおかしくても、押してから気づくのでは遅いので、
+        <b>先にテストの方おひとりに出して、ご自分のLINEで5つのボタンを押して確かめてください。</b><br>
+        個別に出したものは<b>既定より強い</b>ので、その方には外すまで出つづけます（「この方の割り当てを外す」で戻せます）。<br>
+        ★ 中継役は <b>v26 以上</b>が要ります（<code>rmlink</code>／<code>rmunlink</code>）。</p>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+        <select class="f-in" id="rm-who" style="max-width:260px">
+          ${(()=>{const ls=db.customers.filter(c=>c.lineId&&!c.lineBlocked);
+            /* テストの方を先頭に。名簿の並びに関係なく、いつも同じ方が既定で選ばれるように */
+            ls.sort((a,b)=>{const t=c=>/テスト|test/i.test(c.name||"")?0:1;
+              return t(a)-t(b)||String(a.name||"").localeCompare(String(b.name||""),"ja");});
+            return ls.length
+              ?ls.map(c=>`<option value="${esc(c.id)}">${esc(c.name||"（お名前なし）")}</option>`).join("")
+              :`<option value="">LINEとつながっている方がまだいません</option>`;})()}
+        </select>
+        <button class="btn quiet" id="rm-one"${ng.length?" disabled":""}>この方だけに出す</button>
+        <button class="btn ghost" id="rm-unone">この方の割り当てを外す</button>
+        <button class="btn ghost" id="rm-whonow">この方にいま出ているものを見る</button>
+      </div>
+    </div>
+
+    <div class="sheet">
+      <label class="f">② みんなに出す（既定にする）</label>
       <p class="note">★ <b>中継役 v23 以上</b>と、中継役の <b>LINE_TOKEN</b> が要ります。
         どちらかが無いときは、押しても<b>LINEには1バイトも飛ばず</b>、理由だけが出ます。</p>
       <div class="actions" style="flex-wrap:wrap">
@@ -14128,6 +14971,10 @@ function bindLineSet(el,msg){
         put("vfrom",gn("sg-vfrom")); put("vto",gn("sg-vto"));
         put("tfrom",gn("sg-tfrom")); put("tto",gn("sg-tto"));
         put("yfrom",gn("sg-yfrom")); put("yto",gn("sg-yto"));
+        /* v234：カルテッツの実物にあった条件。性別とクーポン3つ */
+        put("sex",g("sg-sex"));
+        put("cpHold",g("sg-cphold")); put("cpUsed",g("sg-cpused"));
+        put("cpDays",gn("sg-cpdays"));
         if(document.getElementById("sg-pace").checked) cr.pace="1";
         return cr;
       };
@@ -14158,6 +15005,26 @@ function bindLineSet(el,msg){
     });
     document.getElementById("cp-add").onclick=()=>{ cpEdit="new"; renderLine(); };
     el.querySelectorAll("[data-cpedit]").forEach(b=>b.onclick=()=>{ cpEdit=b.dataset.cpedit; renderLine(); });
+    /* ★★ v234：クーポンを配る。**送ってから記録する**（送信に失敗したときに
+       「配ったことだけが残る」のを避けるため）。テストは必ずテスト太郎で。 */
+    el.querySelectorAll("[data-cpsend]").forEach(b=>b.onclick=async()=>{
+      const cp=cpById(b.dataset.cpsend); if(!cp) return;
+      const tg=cpTargets(cp).filter(c=>cpDecide(cp.id,c.id).how!=="skip");
+      if(!tg.length){ msg("配る相手がいません",false); return; }
+      const nm=tg.slice(0,3).map(c=>c.name).join("・")+(tg.length>3?` ほか${tg.length-3}名`:"");
+      if(!confirm(`「${cp.name}」を ${tg.length}名に配ります。\n\n${nm}\n\n`
+        +`LINEで通知も送ります。よろしいですか？`)) return;
+      b.disabled=true; msg("送っています…",true);
+      try{
+        let sent=0;
+        for(const c of tg){
+          await lineSend([c.id], cpNoteText(cp,c), cp.noteImg||"");
+          cpGive(cp.id,c.id); sent++;
+        }
+        await save(); renderLine(); toast(`${sent}名に配りました`);
+      }catch(e){ msg("送れませんでした："+e.message,false); await save(); }
+      b.disabled=false;
+    });
     el.querySelectorAll("[data-cpdel]").forEach(b=>b.onclick=async()=>{
       const cp=(db.coupons||[]).find(x=>x.id===b.dataset.cpdel);
       const used=db.line.follows.filter(f=>f.coupon===cp.id).length;
@@ -14166,21 +15033,45 @@ function bindLineSet(el,msg){
       cpEdit=null; await save(); renderLine(); toast("消しました");
     });
     if(cpEdit){
-      document.getElementById("cp-cancel").onclick=()=>{ cpEdit=null; renderLine(); };
+      document.getElementById("cp-cancel").onclick=()=>{ cpEdit=null; fuTim=null; renderLine(); };
       document.getElementById("cp-save").onclick=async()=>{
         const name=g("cp-name");
         if(!name){ msg("クーポン名を入れてください",false); return; }
-        const o={name,body:document.getElementById("cp-body").value,
+        /* v234：配信タイミングはフォローUPと同じ読み方（欄の id も同じ） */
+        const tt=g("fu-t")||"once";
+        const tim={t:tt,at:g("fu-at")||"10:00"};
+        if(tt==="once")  tim.date=g("fu-date");
+        if(tt==="year"){ tim.m=gn("fu-m")||1; tim.d=g("fu-d")||"1"; }
+        if(tt==="month") tim.d=g("fu-d")||"1";
+        if(tt==="week"){ tim.wt=g("fu-wt")||"0"; tim.w=gn("fu-w")||0; }
+        if(tt==="visit") tim.days=Math.max(1,gn("fu-days")||30);
+        const rd=document.querySelector(`#line input[name="cp-redist"]:checked`);
+        const o={name,serial:g("cp-serial").slice(0,20),goal:g("cp-goal")||"saikuru",
+                 body:document.getElementById("cp-body").value,
                  kind:g("cp-kind"),open:document.getElementById("cp-open").checked,
                  endType:g("cp-endtype"),days:Math.max(1,gn("cp-days")||30),
-                 endDate:g("cp-enddate"),times:Math.max(1,gn("cp-times")||1)};
-        if(cpEdit==="new") db.coupons.push(Object.assign({id:newId("cp")},o));
+                 endDate:g("cp-enddate"),times:Math.min(999,Math.max(1,gn("cp-times")||1)),
+                 pubStart:g("cp-pubstart"),pubEnd:g("cp-pubend"),
+                 redist:(rd&&rd.value)||"none",
+                 segId:g("cp-seg"),tim,
+                 noteTitle:g("cp-notetitle").slice(0,30),
+                 noteText:document.getElementById("cp-notetext").value.slice(0,1500),
+                 noteImg:g("cp-noteimg")};
+        if(cpEdit==="new") db.coupons.push(cpNorm(Object.assign({id:newId("cp")},o)));
         else Object.assign(db.coupons.find(x=>x.id===cpEdit),o);
-        cpEdit=null; await save(); renderLine(); toast("保存しました");
+        cpEdit=null; fuTim=null; await save(); renderLine(); toast("保存しました");
       };
     }
 
   }else if(linePage==="tone"){
+    /* v234：カルテッツの「画面デザイン」に合わせて、4つの見本を実際に描いて見せる。
+       ★ 見本は本番と同じ rmDraw() で描いている（別の絵を用意すると、選んだものと
+         出るものが食い違う。カルテッツは見本画像とリッチメニューが同じ絵だった） */
+    Object.keys(RMSKIN).forEach(k=>{
+      const cv=document.getElementById("dz-"+k);
+      if(!cv) return;
+      try{ rmDraw(cv,k); }catch(e){}
+    });
     el.querySelectorAll("[data-tone]").forEach(b=>b.onclick=async()=>{
       db.line.tone=b.dataset.tone; await save(); renderLine();
     });
@@ -14228,8 +15119,9 @@ function bindLineSet(el,msg){
        そのままだと何が悪いのか伝わらないので、言いかえる */
     const relayMsg=e=>{
       const m=String(e&&e.message||e);
-      if(/action を指定/.test(m)) return "中継役が古いです。square-relay_23.gs を貼って、"
-        +"「デプロイを管理 → 新しいバージョン → デプロイ」までやり直してください。";
+      if(/action を指定|知らない action/.test(m)) return "中継役が古いです。square-relay_26.gs を貼って、"
+        +"「デプロイを管理 → 新しいバージョン → デプロイ」までやり直してください。"
+        +"（ひとりだけに出す機能は v26 から。画像を貼るところも v26 で直しました）";
       return m;
     };
 
@@ -14256,10 +15148,21 @@ function bindLineSet(el,msg){
       try{
         const j=await relayGet("rmlist");
         const ms=j.menus||[];
+        /* ★★ v234：ここは中継役の返す欄の名前と食い違っていた（2026-09-14 に実物で判明）。
+           中継役が返すのは **defaultId／aliases／menus[].id**、そして
+           **menus[].areas は「数」**（配列ではない）。
+           v222〜v233 は j.default／j.alias／m.richMenuId／(m.areas||[]).length を読んでいたので、
+           「いま出ているもの」は**いつも「（設定なし）」**、番号は**いつも undefined**、
+           マス数は**いつも 0** と出ていた。**通信は成功しているので、誰も間違いに気づけない。**
+           ★ 古い中継役（j.default を返す版）とも並べて読むようにしてある。 */
+        const defId=j.defaultId||j.default||"";
+        const als=j.aliases||j.alias||[];
+        const areaN=m=>Array.isArray(m.areas)?m.areas.length:(+m.areas||0);
         show(`LINEにあるリッチメニュー ${ms.length}件\n`
-          +`いま既定に出ているもの：${j.default||"（設定なし）"}\n`
-          +(j.alias&&j.alias.length?`切り替えタブ（エイリアス）：${j.alias.length}件\n`:"")
-          +ms.map(m=>`・${m.richMenuId}　${m.name||""}　${(m.areas||[]).length}マス`).join("\n"));
+          +`いま既定に出ているもの：${defId||"（設定なし）"}\n`
+          +(als.length?`切り替えタブ（エイリアス）：${als.length}件\n`:"")
+          +ms.map(m=>`・${m.id||m.richMenuId}　${m.name||""}　${areaN(m)}マス`
+            +((m.id||m.richMenuId)===defId?"　★いま出ているもの":"")).join("\n"));
       }catch(e){ show("見に行けませんでした：\n"+relayMsg(e)); }
     };
 
@@ -14297,6 +15200,62 @@ function bindLineSet(el,msg){
       btn.disabled=false; renderLine();
     };
 
+    /* ★★ v234：**ひとりだけに出す**（利用者の指示「テストはテスト太郎で行え」・2026-09-14）。
+       既定（rm-put）は友だち全員に出るので、先にここで確かめる。
+       中継役 v26 の rmlink／rmunlink を使う。古い中継役だと「知らない action です」が返る */
+    const whoId=()=>{const e=b("rm-who"); return e?e.value:"";};
+    const whoName=()=>{const c=db.customers.find(x=>x.id===whoId()); return c?(c.name||"（お名前なし）"):"";};
+    const whoUid=()=>{const c=db.customers.find(x=>x.id===whoId()); return c?(c.lineId||""):"";};
+
+    if(b("rm-one")) b("rm-one").onclick=async()=>{
+      const uid=whoUid();
+      if(!uid){ show("LINEとつながっている方を選んでください。"); return; }
+      const ng2=rmCheck();
+      if(ng2.length){ show("まだ足りません：\n"+ng2.map(x=>"・"+x).join("\n")); return; }
+      if(!confirm(whoName()+"さんのLINEにだけ、このメニューを出します。\n\n"
+        +"ほかのお客様には出ません（既定は変えません）。\nよろしいですか？")) return;
+      const btn=b("rm-one"); btn.disabled=true;
+      try{
+        show("① 絵を用意しています…");
+        const c3=document.createElement("canvas"); rmDraw(c3);
+        const im=rmImage(c3);
+        if(im.bytes>1000000) throw new Error("画像が1MBを超えました（"+(im.bytes/1024/1024).toFixed(2)+"MB）。");
+        show("② リッチメニューの枠を作っています…");
+        const r1=await relayPost("rmcreate",{def:rmDef()});
+        const id=r1.richMenuId||r1.id;
+        if(!id) throw new Error("richMenuId が返ってきませんでした");
+        show("③ 絵を貼っています（"+(im.bytes/1024).toFixed(0)+"KB）…");
+        await relayPost("rmimg",{id:id,data:im.data});
+        show("④ "+whoName()+"さんに割り当てています…");
+        const r4=await relayGet("rmlink","&u="+encodeURIComponent(uid)+"&id="+encodeURIComponent(id));
+        db.line.rm.testId=id; db.line.rm.testWho=whoId(); db.line.rm.testAt=new Date().toISOString();
+        await save();
+        show(whoName()+"さんにだけ出しました。\nリッチメニューID："+id
+          +(r4&&r4.before?"\n前にこの方へ出ていたもの："+r4.before:"")
+          +"\n\n★ "+whoName()+"さんのLINEでトークを開き直して、5つのボタンを1つずつ押して確かめてください。"
+          +"\n★ よければ「② みんなに出す」へ進んでください。");
+      }catch(e){ show("出せませんでした：\n"+relayMsg(e)); }
+      btn.disabled=false;
+    };
+
+    if(b("rm-unone")) b("rm-unone").onclick=async()=>{
+      const uid=whoUid();
+      if(!uid){ show("LINEとつながっている方を選んでください。"); return; }
+      if(!confirm(whoName()+"さんの個別の割り当てを外します。\n（既定のメニューが出るようになります）")) return;
+      show("外しています…");
+      try{ await relayGet("rmunlink","&u="+encodeURIComponent(uid)); show("外しました。"); }
+      catch(e){ show("外せませんでした：\n"+relayMsg(e)); }
+    };
+
+    if(b("rm-whonow")) b("rm-whonow").onclick=async()=>{
+      const uid=whoUid();
+      if(!uid){ show("LINEとつながっている方を選んでください。"); return; }
+      show("見に行っています…");
+      try{ const j=await relayGet("rmuser","&u="+encodeURIComponent(uid));
+        show(whoName()+"さんにいま出ているもの："+(j.richMenuId||"（個別の割り当ては無し＝既定が出ています）")); }
+      catch(e){ show("見に行けませんでした：\n"+relayMsg(e)); }
+    };
+
     if(b("rm-clear")) b("rm-clear").onclick=async()=>{
       if(!confirm("既定のリッチメニューを外します。\nお客様の画面からメニューが消えます（カルテッツのものも戻りません）。\nよろしいですか？")) return;
       show("外しています…");
@@ -14304,11 +15263,45 @@ function bindLineSet(el,msg){
       catch(e){ show("外せませんでした：\n"+relayMsg(e)); }
     };
   }else if(linePage==="conn"){
-    document.getElementById("lc-save").onclick=async()=>{
-      db.line.oaId=document.getElementById("lc-oa").value.trim();
-      await save(); msg("保存しました",true);
+    /* v234：14ステップのウィザード。★ ボタンは段によって出たり出なかったりするので、
+       **必ず「あれば結ぶ」**。無い id を触ると、そこから下の結線が全部死ぬ */
+    const w=lwiz(), n=LWIZ.length;
+    const cur=Math.min(Math.max(w.step,1),n), st=LWIZ[cur-1];
+    const b=id=>document.getElementById(id);
+    const go=async k=>{ w.step=Math.min(Math.max(k,1),n); await save(); renderLine(); };
+    const mark=async(v)=>{ w.done[st.k]=!!v; await save(); };
+
+    el.querySelectorAll("[data-wstep]").forEach(x=>x.onclick=()=>go(+x.dataset.wstep));
+    el.querySelectorAll("[data-wcopy]").forEach(x=>x.onclick=()=>{
+      const t=b(x.dataset.wcopy); if(!t) return;
+      t.select(); t.setSelectionRange(0,99999);
+      try{ document.execCommand("copy"); toast("コピーしました"); }
+      catch(e){ msg("コピーできませんでした。手で選んでください",false); }
+    });
+    if(b("lc-prev")) b("lc-prev").onclick=()=>go(cur-1);
+    if(b("lc-next")) b("lc-next").onclick=()=>go(cur+1);
+
+    if(b("lc-save")) b("lc-save").onclick=async()=>{
+      db.line.oaId=b("lc-oa").value.trim();
+      await mark(true); await go(cur+1); toast("保存しました");
     };
-    document.getElementById("lc-test").onclick=async()=>{
+    if(b("lc-msgsave")) b("lc-msgsave").onclick=async()=>{
+      w.msgId=b("lc-msgid").value.trim();
+      await mark(true); await go(cur+1); toast("保存しました");
+    };
+    if(b("lc-loginsave")) b("lc-loginsave").onclick=async()=>{
+      w.loginId=b("lc-loginid").value.trim();
+      await mark(true); await go(cur+1); toast("保存しました");
+    };
+    if(b("lc-liffsave")) b("lc-liffsave").onclick=async()=>{
+      w.liffId=b("lc-liff").value.trim();
+      await mark(true); await go(cur+1); toast("保存しました");
+    };
+    if(b("lc-cbok")) b("lc-cbok").onclick=async()=>{ await mark(true); await go(cur+1); };
+    if(b("lc-tokok")) b("lc-tokok").onclick=async()=>{ await mark(true); await go(cur+1); };
+    if(b("lc-yes")) b("lc-yes").onclick=async()=>{ await mark(true); await go(cur+1); };
+    if(b("lc-no")) b("lc-no").onclick=async()=>{ await mark(false); renderLine(); };
+    if(b("lc-test")) b("lc-test").onclick=async()=>{
       msg("確認中…",true);
       try{ const q=await relayGet("quota");
         msg(`つながりました。今月 ${q.used} 通送信ずみ／上限 ${q.limit} 通（${q.type}）`,true); }
@@ -14495,7 +15488,12 @@ function renderLine(){
     bindLineSet(el,msg);
   }else if(lineTab==="link"){
     document.getElementById("l-save").onclick=async()=>{
-      db.line={oaId:document.getElementById("l-oa").value.trim()};
+      /* ★ v234 で直した。v232 までは db.line={oaId:…} と**まるごと置きかえて**いたので、
+         このボタンを押すだけで reminds／follows／rm／tone／sign／nextText が全部消えていた。
+         ensureLine が既定値で埋め直すが、rm.base と rm.book は db.rmver=224 のせいで
+         戻らないため、リッチメニューが出せなくなる。1項目だけ書きかえること。 */
+      ensureLine();
+      db.line.oaId=document.getElementById("l-oa").value.trim();
       await save(); msg("保存しました",true);
     };
     document.getElementById("l-pull").onclick=async()=>{
