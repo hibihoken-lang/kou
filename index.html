@@ -974,7 +974,7 @@
 /* このファイルの版。ファイル名の番号（salon-de-kou-karte_NN.html）と必ずそろえること。
    仕分け待ちの下書きを捨てるかどうかの判定（BUYVER）にも使うので、
    ここを上げ忘れると、古い読み取りで作られた下書きが生き残る（v87でやらかした） */
-const APPVER=236;
+const APPVER=238;
 const KEY="sdk:data";
 /* ★ v133：QC／SEED／PROD／MENU／QK／CHARTS0／STOCK0／ACTUAL／VISITS は
    **わざと空にしてあります。書き戻さないこと。**
@@ -12734,7 +12734,13 @@ function renderSync(){
           <div style="grid-column:1/-1"><label class="f" for="s-url">中継役のURL</label>
             <input class="f-in" id="s-url" value="${esc(conf.url)}" placeholder="https://script.google.com/macros/s/…/exec"></div>
           <div style="grid-column:1/-1"><label class="f" for="s-key">合言葉（APP_KEY）</label>
-            <input class="f-in" id="s-key" value="${esc(conf.key)}"></div>
+            <div style="display:flex;gap:8px;align-items:center">
+              <input class="f-in" id="s-key" type="password" autocomplete="off" spellcheck="false"
+                value="${esc(conf.key)}" style="flex:1;min-width:120px">
+              <button class="btn ghost" id="s-keyshow" type="button">見る</button>
+            </div>
+            <p class="note" style="margin:4px 0 0">★★ ここに入るのは<b>お客様284名のカルテ・写真をぜんぶ取り出せる合言葉</b>です。
+              <b>人に見せない・LINEやメールで送らない</b>でください。肩越しに見えないよう伏せてあります。</p></div>
         </div>
         <div class="actions">
           <button class="btn quiet" id="s-save">設定を保存</button>
@@ -12825,6 +12831,15 @@ function renderSync(){
       const w=document.getElementById("s-who"); if(w) conf.who=w.value;
     };
     document.getElementById("s-who").onchange=async()=>{ grab(); await saveConf(); paintSync(); };
+    /* v238：合言葉の欄は伏せ字。押しているあいだだけ見せる。
+       ★ 画面に出しっぱなしにしない（離席・画面共有・肩越しで漏れる） */
+    const ks=document.getElementById("s-keyshow");
+    if(ks) ks.onclick=()=>{
+      const e=document.getElementById("s-key"); if(!e) return;
+      const hidden=e.type==="password";
+      e.type=hidden?"text":"password";
+      ks.textContent=hidden?"隠す":"見る";
+    };
     document.getElementById("s-save").onclick=async()=>{
       grab(); await saveConf();
       db.relay={url:conf.url,key:conf.key};   // 古い版の端末と行き来できるように残す
@@ -12852,7 +12867,11 @@ function renderSync(){
         const q=qrcode(0,"M"); q.addData(setupLink()); q.make();
         box.innerHTML=`<div class="qr">${q.createSvgTag(4,8)}</div>
           <p class="note">ほかの端末のカメラで読み取ると、URLと合言葉が入ります。<br>
-          読み取ったあと、その端末で<b>「この端末を使う人」</b>を選んでください。</p>`;
+          読み取ったあと、その端末で<b>「この端末を使う人」</b>を選んでください。</p>
+          <p class="note" style="border-left:3px solid var(--warn);padding-left:10px">
+          ★★ <b>このQRには合言葉がそのまま入っています。</b>
+          写真に撮られたり、画面を共有していたりすると、<b>お客様のカルテと写真がぜんぶ読めます。</b><br>
+          渡す相手の端末だけに見せて、<b>終わったらこのボタンをもう一度押して閉じて</b>ください。</p>`;
       }catch(e){ msg("QRを作れませんでした："+e.message,false); }
     };
     return;
