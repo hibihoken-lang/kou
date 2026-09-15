@@ -974,7 +974,7 @@
 /* このファイルの版。ファイル名の番号（salon-de-kou-karte_NN.html）と必ずそろえること。
    仕分け待ちの下書きを捨てるかどうかの判定（BUYVER）にも使うので、
    ここを上げ忘れると、古い読み取りで作られた下書きが生き残る（v87でやらかした） */
-const APPVER=238;
+const APPVER=240;
 const KEY="sdk:data";
 /* ★ v133：QC／SEED／PROD／MENU／QK／CHARTS0／STOCK0／ACTUAL／VISITS は
    **わざと空にしてあります。書き戻さないこと。**
@@ -1202,16 +1202,58 @@ async function rescueLoad(){
   catch(e){ rescueCache=null; }
   return rescueCache;
 }
+/* ★★★ v240：**内部の札（id）だけで「もう持っているか」を見ていたのが、
+   予約とお客様が二重になる原因だった。** ★★★
+
+   2026-09-15、利用者の指摘（川口さんのiPadで「1回の予約メールで2つ入る」）から
+   正本を調べたら、**同じ予約番号のものが5組10件**あった。もとのメールは1通ずつで、
+   サロンボードも読み取り（applyMail）も正しかった。
+
+   起きかたはこう：
+     端末A が予約メールを読む → 予約をつくる（id=szi9ga8y）→ 正本に保存
+     端末B が同じメールを読む → 予約をつくる（id=ydiamcm0）→ 断られる
+     端末B で「相手のぶんを取り込む」→「足りないぶんを戻す」
+       → ここで **id が違うから無い** と判断して足していた → 2件になる
+   作られた時刻が8〜14分違いのものが多く、2台を同じ時間帯に開いた日に起きている。
+
+   直しかた：**同じものを見分ける手がかりを増やす。**
+     予約   … 予約番号（resNo）・メールID（mailId）
+     お客様 … 電話（数字だけ10桁以上）・お名前（空白のゆれを無視）
+   ★ お名前で同じと見るのは applyMail（v212）と同じ考えかた。同姓同名の別人がくっつく
+     目はあるが、**黙って2件目を作るほうが実害が大きい**（記録が2つに割れる）。
+   ★★ 足さなかったお客様は **id の読み替え表**に入れ、そのあと足すカルテと予約の
+     `cid` を書きかえる。ここを飛ばすと、**持ち主のいないカルテ**ができる。 */
 function rescueDiff(rc){
   const r=(rc||rescueCache); if(!r||!r.db) return null;
-  const miss=(mine,theirs)=>{
-    const has=new Set((mine||[]).map(x=>x.id));
-    return (theirs||[]).filter(x=>x&&x.id&&!has.has(x.id));
-  };
-  return {at:r.at||"",
-          customers:miss(db.customers,r.db.customers),
-          charts:miss(db.charts,r.db.charts),
-          appts:miss(db.appts,r.db.appts)};
+  const telOf=x=>String((x&&x.tel)||"").replace(/[^0-9]/g,"");
+  const nmOf =x=>String((x&&x.name)||"").replace(/\s+/g,"");
+  const myC=db.customers||[], myA=db.appts||[], myK=db.charts||[];
+
+  /* お客様：すでにいる方は足さず、id の読み替え表に入れる */
+  const idmap={}, custs=[];
+  ((r.db&&r.db.customers)||[]).forEach(x=>{
+    if(!x||!x.id) return;
+    if(myC.some(y=>y.id===x.id)) return;                       // もう持っている
+    const t=telOf(x);
+    const same=(t.length>=10?myC.find(y=>telOf(y)===t):null)
+            || (nmOf(x)?myC.find(y=>nmOf(y)===nmOf(x)):null) || null;
+    if(same){ idmap[x.id]=same.id; return; }                   // 同じ方がすでにいる
+    custs.push(x);
+  });
+  const fixCid=x=>(x&&x.cid&&idmap[x.cid])?Object.assign({},x,{cid:idmap[x.cid]}):x;
+
+  /* 予約：id・予約番号・メールID のどれかが当たれば足さない */
+  const aId=new Set(myA.map(x=>x.id));
+  const aRes=new Set(myA.filter(x=>x.resNo).map(x=>x.resNo));
+  const aMail=new Set(myA.filter(x=>x.mailId).map(x=>x.mailId));
+  const appts=((r.db&&r.db.appts)||[]).filter(x=>x&&x.id&&!aId.has(x.id)
+      &&!(x.resNo&&aRes.has(x.resNo))&&!(x.mailId&&aMail.has(x.mailId))).map(fixCid);
+
+  /* カルテ：人が書くものなので id だけで見る。cid の読み替えだけする */
+  const kId=new Set(myK.map(x=>x.id));
+  const charts=((r.db&&r.db.charts)||[]).filter(x=>x&&x.id&&!kId.has(x.id)).map(fixCid);
+
+  return {at:r.at||"", customers:custs, charts:charts, appts:appts};
 }
 async function rescueRestore(){
   const d=rescueDiff(); if(!d) return null;
@@ -1643,6 +1685,43 @@ function normalizeDb(){
     Object.entries(STOCK0).forEach(([m,v])=>{ db.stock[m]=Object.assign({},v,db.stock[m]||{}); });
     db.seedver=SEEDVER;
   }
+  /* ★ v240：同じ予約番号の予約が2件以上あったら、開いたときに静かに1件へまとめる。
+     rescueDiff は直したが、**すでに正本に入ってしまったぶんは残る**（2026-09-15 時点で5組10件）。
+     normalizeDb は「端末の写しから開いたとき」「正本を取り込んだとき」「ほかの端末から
+     受け取ったとき」の3つとも通るので、ここに置けば、どの端末でも開いた瞬間に片づく。 */
+  dedupeAppts();
+}
+/* 同じ予約番号の予約を1件にまとめる（v240）。
+   ★ 予約番号（resNo）はサロンボードが1つの予約に1つ振るもの。**手で入れた予約には付かない**
+     （`src` が「直接」のものは resNo が空）。だから、別の予約がくっつくことはない。
+   残すのは **人が手で直したもの → 取消などの印があるもの → 先に作られたもの** の順。
+   消すほうにしか値の無い欄は、残すほうへ移してから消す（書いたものを落とさない）。
+   ★ カルテは予約にぶら下がっていない（`cid` と日付で結びついている）ので、
+     予約をまとめてもカルテは1件も減らない。 */
+function dedupeAppts(){
+  const by={};
+  (db.appts||[]).forEach(a=>{ if(a&&a.resNo) (by[a.resNo]=by[a.resNo]||[]).push(a); });
+  const drop=new Set();
+  Object.keys(by).forEach(k=>{
+    const list=by[k]; if(list.length<2) return;
+    /* ★ カルテが結びついているほうを必ず残す。カルテは予約にぶら下がっておらず
+       「同じ方（cid）・同じ日」で結びつくので、**cid が違う2件のうちカルテの無いほうを
+       残すと、予約とカルテが別々の方に分かれて見える**（2026-09-15 の渡邊さんの形） */
+    const hasK=a=>(db.charts||[]).some(c=>c.cid===a.cid&&c.date===a.date)?4:0;
+    const score=a=>hasK(a)+((a.edited&&Object.keys(a.edited).length)?2:0)+(a.status?1:0);
+    const keep=list.slice().sort((x,y)=>
+      score(y)-score(x) || String(x.created||"").localeCompare(String(y.created||"")))[0];
+    list.forEach(a=>{
+      if(a===keep) return;
+      Object.keys(a).forEach(f=>{                       // 残すほうが空の欄だけ引き継ぐ
+        if(f==="id") return;
+        if(keep[f]===undefined||keep[f]===null||keep[f]==="") keep[f]=a[f];
+      });
+      drop.add(a.id);
+    });
+  });
+  if(drop.size) db.appts=(db.appts||[]).filter(a=>!drop.has(a.id));
+  return drop.size;
 }
 async function save(){
   /* v206：**保存できなかったことが、2秒半で消えるトーストにしか出ていなかった。**
